@@ -1,0 +1,36 @@
+/* mp-skin.css: the multiplayer table uses the same look as the solo tables (table-skin.css): a racetrack stadium
+   felt in the user's felt and rail colours (theme.js), and the same plate. Loaded after mp.css and table-skin.css. */
+
+/* stadium felt: the box is set by layoutTable() in mp.js; 999px clamps to a semicircle at each end */
+#mp-table .mp-felt, .mp-table .mp-felt {
+  border-radius: 999px;
+  background:
+    radial-gradient(ellipse 62% 58% at 50% 46%, color-mix(in srgb, var(--felt-user-3) 55%, transparent) 0%, transparent 70%),
+    radial-gradient(ellipse at 50% 40%, var(--felt-user) 0%, color-mix(in srgb, var(--felt-user) 70%, var(--felt-user-2)) 60%, var(--felt-user-2) 100%);
+  border: 0;
+  box-shadow: inset 0 14px 30px rgb(0 0 0 / 0.5), inset 0 -12px 26px rgb(0 0 0 / 0.4),
+    0 0 0 10px var(--rail-user), 0 0 0 12px var(--rail-user-2), 0 0 0 22px color-mix(in srgb, var(--rail-user-2) 60%, #000);
+}
+#mp-table .mp-felt::after, .mp-table .mp-felt::after {
+  content: ""; position: absolute; inset: 12px; border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.04); pointer-events: none;
+}
+
+/* the multiplayer plate picks up the solo plate's rounded dark surface */
+.mp-table .mp-seat {
+  background: linear-gradient(180deg, #2b2e34 0%, #1c1e22 100%);
+  border: 1px solid rgb(255 255 255 / 0.09);
+  border-radius: 14px;
+  box-shadow: 0 8px 18px rgb(0 0 0 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.07);
+}
+.mp-table .mp-seat.turn {
+  outline: 2px solid var(--hl-user);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--hl-user) 18%, transparent), 0 0 20px color-mix(in srgb, var(--hl-user) 50%, transparent), 0 8px 18px rgb(0 0 0 / 0.55);
+}
+
+/* Header order: back arrow first at the far left; the floating Look (palette) button moves to the right end
+   of the header, after the profile chip and tools, so it never pushes the back arrow. */
+body:has(.mp-app) .look-btn.look-float { left: auto; right: 8px; top: 8px; }
+body:has(.mp-app) .mp-tools { padding-right: 52px; }
+body:has(.mp-app) .mp-tbar { padding-left: 0; margin-left: 0; }

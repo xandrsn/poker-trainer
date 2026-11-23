@@ -1,0 +1,192 @@
+/* ui-controls.css: range sliders (bet amount, volume, multiplayer raise). Dark theme.
+ * A thick rounded track (8px) filled up to --p (set by ui-controls.js) in the accent colour; a large round thumb
+ * (28px visible, 44px touch area: the border is transparent) with a soft shadow, scale on hover/press, focus ring.
+ * WebKit/Blink use ::-webkit-slider-*, Firefox ::-moz-range-*. */
+input[type="range"].ui-range {
+  --ui-accent: var(--gold-text, #d9b25f);
+  --ui-track: rgb(255 255 255 / 0.14);
+  --ui-thumb: #f4efe2;
+  -webkit-appearance: none; appearance: none;
+  display: block; box-sizing: border-box;
+  width: 100%; height: 44px; margin: 0; padding: 0;
+  background: transparent; cursor: pointer; touch-action: none;
+  accent-color: var(--ui-accent);
+}
+input[type="range"].ui-range:focus { outline: none; }
+input[type="range"].ui-range:disabled { opacity: 0.4; cursor: default; }
+
+/* WebKit / Blink */
+input[type="range"].ui-range::-webkit-slider-runnable-track {
+  height: 8px; border: 0; border-radius: 999px; box-sizing: border-box;
+  background: linear-gradient(to right, var(--ui-accent) 0 var(--p, 50%), var(--ui-track) var(--p, 50%) 100%);
+}
+input[type="range"].ui-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 44px; height: 44px; margin-top: -18px; box-sizing: border-box;
+  border: 8px solid transparent; border-radius: 50%;
+  background: var(--ui-accent) content-box;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.55);
+  transition: transform 120ms ease;
+}
+input[type="range"].ui-range:hover::-webkit-slider-thumb { transform: scale(1.08); }
+input[type="range"].ui-range:active::-webkit-slider-thumb { transform: scale(0.94); }
+input[type="range"].ui-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px #000, 0 0 0 5px var(--ui-accent); }
+
+/* Firefox */
+input[type="range"].ui-range::-moz-range-track {
+  height: 8px; border: 0; border-radius: 999px; box-sizing: border-box;
+  background: linear-gradient(to right, var(--ui-accent) 0 var(--p, 50%), var(--ui-track) var(--p, 50%) 100%);
+}
+input[type="range"].ui-range::-moz-range-progress { background: transparent; height: 8px; }
+input[type="range"].ui-range::-moz-range-thumb {
+  width: 44px; height: 44px; box-sizing: border-box;
+  border: 8px solid transparent; border-radius: 50%;
+  background: var(--ui-accent) content-box;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.55);
+  transition: transform 120ms ease;
+}
+input[type="range"].ui-range:hover::-moz-range-thumb { transform: scale(1.08); }
+input[type="range"].ui-range:active::-moz-range-thumb { transform: scale(0.94); }
+input[type="range"].ui-range:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px #000, 0 0 0 5px var(--ui-accent); }
+
+/* ---- action row: Fold when Check is free (set by app.js updateControls). Still clickable, only dimmed. ---- */
+.btn-fold.is-free-check { opacity: .45; filter: saturate(.55); }
+.btn-fold.is-free-check:not(:disabled):hover { opacity: .7; filter: saturate(.8); transform: translateY(-1px); }
+
+/* ---- Raise presets (all solo hands). The amount in BB sits beside the name. ---- */
+.raise-quick [data-rq] { display: inline-flex; align-items: baseline; gap: 4px; }
+.raise-quick .rq-amt { opacity: .75; font-size: .92em; }
+.raise-quick .rq-amt:empty { display: none; }
+.raise-quick [data-rq][aria-pressed="true"] { outline: 2px solid var(--gold); outline-offset: -2px; }
+.btn-raise.lp-arming { animation: lp-ring 450ms linear forwards; }
+@keyframes lp-ring {
+  from { box-shadow: 0 0 0 0 rgba(var(--raise-rgb, 120, 200, 120), .9); }
+  to { box-shadow: 0 0 0 7px rgba(var(--raise-rgb, 120, 200, 120), 0); }
+}
+
+/* ---- Exact-amount popover (long press on Raise) ---- */
+.raise-pop {
+  position: fixed; z-index: 60; left: 8px; top: 8px; box-sizing: border-box;
+  width: min(264px, calc(100vw - 16px)); display: grid; gap: 8px; padding: 12px;
+  background: var(--surface); color: var(--text); border: 1px solid var(--line);
+  border-radius: 14px; box-shadow: 0 14px 34px rgba(0, 0, 0, .5);
+}
+.raise-pop.hidden { display: none; }
+.raise-pop .rp-title { margin: 0; font-size: 13px; opacity: .8; }
+.raise-pop .rp-row { display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px; gap: 8px; align-items: center; }
+.raise-pop .rp-step { min-width: 44px; min-height: 44px; padding: 0; font-size: 22px; line-height: 1; }
+.raise-pop .rp-field {
+  display: flex; align-items: center; gap: 6px; min-height: 44px; min-width: 0; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+}
+.raise-pop .rp-field input {
+  flex: 1 1 auto; min-width: 0; width: 100%; background: transparent; border: 0; color: inherit;
+  font: inherit; font-size: 20px; text-align: right; font-variant-numeric: tabular-nums;
+}
+.raise-pop .rp-field input:focus-visible { outline: none; }
+.raise-pop .rp-field input.invalid { color: var(--fold); }
+.raise-pop .rp-field:focus-within { border-color: var(--gold); }
+.raise-pop .rp-range { margin: 0; font-size: 12px; opacity: .75; }
+.raise-pop .rp-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
+.raise-pop .rp-actions button { min-height: 44px; }
+.raise-pop .rp-actions .btn-raise { font-size: 15px; }
+.raise-pop .rp-actions button:disabled { opacity: .4; }
+
+/* ---- Phones (narrow or touch): no slider and no number box; the presets carry the sizing. ---- */
+@media (max-width: 600px), (pointer: coarse) {
+  .raise-ctl #raise-range, .raise-ctl #raise-num { display: none; }
+  .raise-ctl { flex-wrap: wrap; }
+  .raise-ctl .raise-quick {
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; width: 100%;
+  }
+  .raise-ctl .raise-quick [data-rq] {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-width: 0; min-height: 44px; padding: 3px 2px; font-size: 12px; line-height: 1.1; gap: 1px;
+  }
+  .raise-ctl .raise-quick .rq-amt { font-size: 11px; opacity: .8; }
+  .raise-ctl .raise-quick .rq-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+}
+
+/* ================= short and narrow game screens: the hero popups, the ranges drawer and the F/C/R labels fit their boxes ================= */
+/* action labels stay one line on phones (smaller type, so the F/C/R row keeps its 48px height) */
+@media (max-width: 600px) {
+  .actions .action-row .big .label { white-space: nowrap; font-size: 12px; letter-spacing: -0.01em; }
+}
+/* <=400 px: "Raise to 63.2 BB" still fits on one line at a smaller size. A wrapped label grew the F/C/R row by 4 px (smoke-solo 390x844). */
+@media (max-width: 400px) {
+  .actions .action-row .big .label { font-size: 11px; letter-spacing: -0.02em; }
+  /* "Raise to 103.5 BB" (81 px) was cut to "Raise to 103.5..." in a 75 px column at 360 px: the raise column takes more of the row */
+  .actions .action-row { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.3fr); }
+}
+/* desktop-width popups on a 600 px-high screen: tighter padding and type, so the verdict and OK fit the reserved row */
+@media (min-width: 701px) and (max-height: 640px) {
+  .hero-area > .feedback { padding: 6px 10px; gap: 4px var(--s2); }
+  .hero-area > .feedback .v-summary { font-size: 14px; line-height: 1.3; }
+  .hero-area > .feedback .v-meta { margin-top: 0; font-size: 12px; }
+  .hero-area > .feedback .btn-next { min-height: 34px; font-size: 14px; padding: 0 var(--s3); }
+  .hero-area > .cpu-result { padding: 6px 10px; }
+  .hero-area > .cpu-result h3 { margin: 0 0 2px; font-size: 14px; line-height: 1.2; }
+  .hero-area > .cpu-result .cpu-lines { font-size: 12px; line-height: 1.3; }
+  .hero-area > .cpu-result .cpu-lines li { margin: 0; }
+  .hero-area > .cpu-result .btn-next { min-height: 34px; font-size: 14px; margin-top: 4px; padding: 0 var(--s3); }
+}
+/* the ranges drawer on short screens (390 px high landscape, 600 px laptops): smaller grid cells and legend, no field padding */
+@media (max-height: 640px) {
+  .ranges-pane .field, .ranges-drawer .field, .ranges-pane label.field, .ranges-drawer label.field { height: auto; min-height: 0; margin-bottom: 0; gap: 1px; }
+  .ranges-pane .helper-controls .field select, .ranges-drawer .helper-controls .field select { min-height: 22px; height: 22px; font-size: 11px; }
+  .ranges-pane .rg-cell, .ranges-drawer .rg-cell { min-height: 10px; font-size: 8px; line-height: 1; }
+  .ranges-pane .rg-head, .ranges-pane .rg-corner, .ranges-drawer .rg-head, .ranges-drawer .rg-corner { min-height: 10px; line-height: 10px; font-size: 8px; }
+  .ranges-pane .helper-note, .ranges-drawer .helper-note { font-size: 10px; line-height: 1.2; margin-top: 0; min-height: 0; }
+  .ranges-pane .legend-list li, .ranges-drawer li, .ranges-pane li { font-size: 10px; line-height: 1.2; }
+}
+/* short desktop popup: the cpu result lists its five lines in two columns (the panel is only as tall as the hero row) */
+@media (min-width: 701px) and (max-height: 640px) {
+  .hero-area > .cpu-result .cpu-lines { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; }
+}
+/* phone and landscape strip: the verdict text gives way (ellipsis) before the % chip and More/OK */
+@media (max-width: 700px), (max-height: 500px) {
+  .hero-area > .feedback #fb-practice, .hero-area > .feedback .verdict, .hero-area > .feedback .v-head { min-width: 0; max-width: 100%; overflow: hidden; }
+  .hero-area > .feedback .v-summary { flex: 1 1 auto; width: auto; min-width: 0; }
+  .hero-area > .feedback .v-meta, .hero-area > .feedback .fb-more-strip, .hero-area > .feedback .btn-next { flex-shrink: 0; }
+}
+/* 360-400 px wide: the % chip goes so that the headline keeps a readable column next to the icon and Full explanation */
+@media (max-width: 400px), (max-height: 500px) {
+  .hero-area > .feedback .chip-pct { display: none; }
+}
+
+/* Practice and Single spots verdict: big rating icon (fixed size, so nothing reflows), one headline, and the
+   Full explanation drawer (a fixed panel over the table; it never moves F/C/R or OK). */
+.verdict .v-head { align-items: center; gap: var(--s3); flex-wrap: nowrap; }
+.verdict .v-icon { flex: 0 0 auto; display: inline-flex; width: 64px; height: 64px; }
+.verdict .v-icon svg { width: 64px; height: 64px; display: block; }
+.verdict .v-icon.rv-enter, .verdict .v-icon { animation: v-icon-in 160ms ease-out both; }
+.verdict .v-summary { font-size: clamp(20px, 2.8vh, 26px); line-height: 1.15; min-width: 0; overflow-wrap: anywhere; }
+@keyframes v-icon-in { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .verdict .v-icon { animation: none; } }
+@media (max-width: 700px), (max-height: 500px) {
+  .verdict .v-icon, .verdict .v-icon svg { width: 48px; height: 48px; }
+  .hero-area > .feedback .verdict .v-icon { width: 48px; height: 48px; }
+  .hero-area > .feedback .verdict .v-icon svg { width: 48px; height: 48px; }
+  .hero-area > .feedback .verdict .v-summary { font-size: 15px; }
+}
+
+#fx-drawer.fx-drawer { position: fixed; inset: 0; z-index: 1600; display: flex; align-items: center; justify-content: center;
+  padding: var(--s4); background: rgb(0 0 0 / 0.28); }
+#fx-drawer.fx-drawer.hidden { display: none; }
+.fx-box { width: min(520px, 100%); max-height: min(72dvh, 560px); display: flex; flex-direction: column; min-height: 0;
+  background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-lg);
+  box-shadow: var(--elev-raised); padding: var(--s4); }
+.fx-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+.fx-head h3 { margin: 0; font-size: var(--fs-title); }
+.fx-body { overflow-y: auto; min-height: 0; margin: var(--s3) 0; overscroll-behavior: contain; }
+.fx-line { margin: 0 0 var(--s2); font-size: var(--fs-sm); line-height: 1.5; color: var(--text); }
+.fx-line:last-child { margin-bottom: 0; }
+.fx-always { display: flex; align-items: center; gap: var(--s2); min-height: 44px; font-size: var(--fs-sm); color: var(--muted); cursor: pointer; }
+.fx-always input { width: 18px; height: 18px; margin: 0; accent-color: var(--gold, currentColor); }
+.fx-close { min-height: 44px; }
+.verdict .fb-full { margin: 0; min-height: 36px; }
+@media (max-width: 700px), (max-height: 500px) { .verdict .fb-full { display: none; } }
+/* desktop popup on short screens: the big verdict icon shrinks so the card (icon, chips, Full explanation, OK) stays inside its reserved row */
+@media (min-width: 701px) and (min-height: 501px) and (max-height: 760px) { .verdict .v-icon, .verdict .v-icon svg { width: 48px; height: 48px; } }
+@media (min-width: 701px) and (min-height: 501px) and (max-height: 640px) { .verdict .v-icon, .verdict .v-icon svg { width: 40px; height: 40px; } }
+@media (min-width: 701px) and (max-height: 640px) { .hero-area > .feedback:not(.expanded) { max-height: none; } }

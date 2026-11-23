@@ -1,0 +1,113 @@
+/* Main menu hub: two main tiles (Play, Practice) and their options.
+   Wide: each group is [main][options] in one row. Narrow: two columns, options under the active main.
+   Compact (short landscape, e.g. 844x390): wide with smaller tiles. Motion: transform and opacity. */
+
+[data-view="menu"] .menu-view[data-step="settings"] .menu-hub { display: none; }
+
+[data-view="menu"] .menu-hub {
+  display: flex; flex-direction: row; align-items: center; justify-content: center;
+  gap: clamp(18px, 2.4vw, 32px); width: 100%; max-width: 1180px; margin: 0 auto;
+  padding: 6px 0 4px;
+}
+[data-view="menu"] .hub-group { display: flex; flex-direction: row; align-items: center; gap: 12px; min-width: 0; flex: 0 0 auto; }
+
+/* Main tiles: same size, centred content, lift 2px on hover (no scale), gold edge when active. */
+[data-view="menu"] .hub-main {
+  position: relative; flex: 0 0 auto; box-sizing: border-box;
+  width: 210px; height: clamp(136px, 22vh, 168px); margin: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  padding: 14px 16px; border-radius: 16px; cursor: pointer;
+  background: linear-gradient(180deg, rgb(var(--surface-rgb, 30 36 44) / 0.96), var(--surface, #1b2029));
+  border: 1px solid rgb(var(--white-rgb, 255 255 255) / 0.10);
+  color: var(--text, #f2f2f2); font: inherit; text-align: center;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background-color 180ms ease;
+}
+[data-view="menu"] .hub-main:hover,
+[data-view="menu"] .hub-main[aria-expanded="true"] { transform: translateY(-2px); }
+[data-view="menu"] .hub-main:hover { border-color: var(--gold, #d4af37); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--gold, #d4af37), 0 0 22px rgba(212, 175, 55, 0.22); }
+[data-view="menu"] .hub-main[aria-expanded="true"] {
+  border-color: var(--gold, #d4af37);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--gold, #d4af37), 0 0 26px rgba(212, 175, 55, 0.30);
+}
+[data-view="menu"] .hub-main:focus-visible { outline: 2px solid var(--gold, #d4af37); outline-offset: 3px; }
+[data-view="menu"] .hub-main .hm-icon { color: var(--gold, #d4af37); display: inline-flex; }
+[data-view="menu"] .hub-main .hm-name { font-size: 20px; font-weight: 700; letter-spacing: 0.01em; }
+[data-view="menu"] .hub-main .hm-desc { font-size: 12.5px; line-height: 1.35; opacity: 0.72; max-width: 100%; text-wrap: balance; }
+
+/* Options: the same tile as before (.mode-card), revealed beside (wide) or below (narrow) the main tile. */
+[data-view="menu"] .hub-opts { display: none; gap: 10px; flex: 0 0 auto; }
+[data-view="menu"] .hub-group.is-open .hub-opts { display: flex; }
+[data-view="menu"] .hub-opts > .mode-card {
+  width: 176px !important; height: clamp(150px, 22vh, 160px) !important; min-height: 0 !important; max-height: none !important;
+  margin: 0; padding: 12px 12px !important; box-sizing: border-box; flex: 0 0 auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  animation: hubIn 260ms ease-out both; animation-delay: calc(var(--i, 0) * 40ms);
+}
+[data-view="menu"] .hub-opts > .mode-card .mc-desc { font-size: 11.5px; line-height: 1.3; }
+[data-view="menu"] .hub-opts > .mode-card .mc-name { font-size: 15px; }
+[data-view="menu"] .hub-opts > .mode-card:last-child:nth-child(odd) { grid-column: auto; }
+
+@keyframes hubIn {
+  from { opacity: 0; transform: translateX(-14px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Wide, large screens: tiles a little bigger. */
+@media (min-width: 1280px) {
+  [data-view="menu"] .hub-main { width: 240px; }
+  [data-view="menu"] .hub-opts > .mode-card { width: 204px !important; }
+}
+
+/* Narrow (phones, tablets, portrait): two columns. The active main opens its options below it. */
+@media (max-width: 959px) and (min-height: 521px) {
+  [data-view="menu"] .menu-hub {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start;
+    gap: 12px; max-width: 560px;
+  }
+  [data-view="menu"] .hub-group { flex-direction: column; align-items: stretch; gap: 8px; }
+  [data-view="menu"] .hub-main { width: 100%; height: 104px; padding: 10px 10px; }
+  [data-view="menu"] .hub-main .hm-desc { display: none; }
+  [data-view="menu"] .hub-opts { flex-direction: column; gap: 8px; }
+  [data-view="menu"] .hub-opts > .mode-card {
+    width: 100% !important; height: 64px !important; flex-direction: row !important; justify-content: flex-start;
+    gap: 10px; padding: 8px 12px !important; text-align: left; flex-wrap: nowrap; align-items: center;
+  }
+  [data-view="menu"] .hub-opts > .mode-card .mc-name { text-align: left; align-self: center; flex: 1 1 auto; width: auto; min-width: 0; }
+  [data-view="menu"] .hub-opts > .mode-card .mc-icon { flex: 0 0 auto; order: 0; }
+  [data-view="menu"] .hub-opts > .mode-card .mc-icon svg { width: 20px; height: 20px; }
+  [data-view="menu"] .hub-opts > .mode-card .mc-desc { display: none; }
+  [data-view="menu"] .hub-opts > .mode-card .mc-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* Short landscape screens (844x390 and similar): options stay beside the main tile, in a compact form. */
+@media (max-height: 520px) and (min-width: 640px) {
+  [data-view="menu"] .menu-hub { gap: 14px; }
+  [data-view="menu"] .hub-main { width: 156px; height: 92px; padding: 8px 10px; gap: 2px; }
+  [data-view="menu"] .hub-main .hm-icon svg { width: 22px; height: 22px; }
+  [data-view="menu"] .hub-main .hm-name { font-size: 16px; }
+  [data-view="menu"] .hub-main .hm-desc { display: none; }
+  [data-view="menu"] .hub-group { gap: 8px; }
+  [data-view="menu"] .hub-opts { gap: 8px; }
+  [data-view="menu"] .hub-opts > .mode-card { width: 138px !important; height: 92px !important; padding: 6px 8px !important; gap: 2px; }
+  [data-view="menu"] .hub-opts > .mode-card .mc-icon svg { width: 18px; height: 18px; }
+  [data-view="menu"] .hub-opts > .mode-card .mc-desc { display: none; }
+  [data-view="menu"] .hub-opts > .mode-card .mc-name { font-size: 13px; line-height: 1.2; }
+}
+
+/* Not enough width for a single row of four tiles beside the main tile: the open options form a 2 x 2 grid
+   beside the main tile (the row stays within 960px: one group is open at a time). */
+@media (min-width: 960px) and (max-width: 1399px) {
+  [data-view="menu"] .hub-group.is-open .hub-opts { display: grid; grid-template-columns: repeat(2, max-content); max-width: none; }
+}
+@media (max-height: 520px) and (min-width: 640px) {
+  [data-view="menu"] .hub-opts { flex-wrap: wrap; max-width: 292px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-view="menu"] .hub-main,
+  [data-view="menu"] .hub-opts > .mode-card,
+  [data-view="menu"] .hub-group { transition: none !important; animation: none !important; }
+  [data-view="menu"] .hub-main:hover,
+  [data-view="menu"] .hub-main[aria-expanded="true"] { transform: none; }
+}

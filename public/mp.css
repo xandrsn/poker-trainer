@@ -1,0 +1,1277 @@
+/* Multiplayer client (mp.js). Flat, dark-theme styling built only from the shared tokens in
+ * style.css. The screen fills the viewport (100dvh grid) and does not scroll the page: only the
+ * camera column, the player list and the lobby panel scroll inside their own boxes.
+ * Text is never below 13px. */
+
+#mp-root { width: 100%; min-height: 0; height: calc(100dvh - var(--mp-top, 0px)); }
+#mp-root[hidden] { display: none; }
+#mp-root.mp-standalone { position: fixed; inset: 0; z-index: 40; height: 100dvh; background: var(--bg); }
+
+.mp-app {
+  box-sizing: border-box; height: 100%; width: 100%;
+  display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px;
+  padding: 12px 16px; overflow: hidden;
+  color: var(--text); background: var(--bg);
+  font-family: var(--font); font-size: 15px; line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+.mp-app *, .mp-app *::before, .mp-app *::after { box-sizing: border-box; }
+.mp-app .hidden { display: none !important; }
+.mp-app h2, .mp-app h3, .mp-app p { margin: 0; }
+.mp-app ul { margin: 0; padding: 0; list-style: none; }
+.mp-app small, .mp-app .mp-note { font-size: 13px; }
+
+.mp-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mp-title { font-size: 20px; font-weight: var(--fw-strong); }
+.mp-h { font-size: 16px; font-weight: var(--fw-strong); margin-bottom: 8px; }
+.mp-muted { color: var(--muted); }
+.mp-note { color: var(--muted); font-size: 13px; }
+.mp-err { color: var(--fold); margin: 4px 0; }
+.mp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mp-out { display: flex; align-items: center; min-height: 44px; font-weight: var(--fw-strong); }
+
+.mp-alert {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 60; max-width: min(92vw, 420px);
+  padding: 8px 16px; border-radius: 999px; font-size: 14px; text-align: center; pointer-events: none;
+  background: rgba(20, 14, 14, .94); border: 1px solid var(--fold); color: #fff; box-shadow: 0 6px 20px rgba(0,0,0,.45);
+}
+.mp-alert.hidden { display: none; }
+
+.mp-conn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px;
+  color: var(--muted); font-size: 14px;
+}
+.mp-dot { display: inline-block; flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.mp-dot.on { background: var(--raise); }
+.mp-dot.warn { background: var(--warn); }
+.mp-dot.off { background: var(--fold); }
+
+.mp-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px; min-width: 0; }
+
+.mp-btn {
+  min-height: 44px; padding: 0 14px;
+  border-radius: var(--r-sm); border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--text);
+  font: inherit; font-size: 15px; font-weight: var(--fw-strong); cursor: pointer;
+}
+.mp-btn:hover { border-color: var(--muted); }
+.mp-btn:active { transform: scale(0.98); }
+.mp-btn.small { min-height: 36px; padding: 0 10px; font-size: 14px; }
+.mp-btn.primary { background: var(--gold); border-color: var(--gold); color: var(--on-accent, var(--suit-ink)); }
+.mp-btn.danger { border-color: var(--fold); color: var(--fold); }
+.mp-btn.big { width: 100%; min-height: 52px; font-size: 16px; }
+.mp-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.mp-btn:focus-visible, .mp-act:focus-visible, .mp-field input:focus-visible, .mp-field select:focus-visible,
+.mp-raise-ctl input:focus-visible {
+  outline: 2px solid var(--gold); outline-offset: 2px;
+}
+
+.mp-field { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 14px; min-width: 0; }
+.mp-field input, .mp-field select, .mp-stackrow input {
+  min-height: 44px; min-width: 0; padding: 0 10px;
+  border-radius: var(--r-sm); border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--text); font: inherit; font-size: 15px;
+}
+.mp-field input[type="range"] { padding: 0; accent-color: var(--gold); min-height: 36px; }
+.mp-check { display: flex; align-items: center; gap: 8px; min-height: 44px; color: var(--text); font-size: 15px; }
+.mp-check input { width: 20px; height: 20px; accent-color: var(--gold); }
+
+/* entry and profile */
+.mp-entry { display: flex; justify-content: center; align-items: flex-start; overflow: auto; }
+.mp-form { display: flex; flex-direction: column; gap: 12px; width: min(460px, 100%); padding: 16px; }
+.mp-profile { display: flex; flex-direction: column; gap: 10px; }
+.mp-photo-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.mp-photo-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.mp-av {
+  display: inline-grid; place-items: center; flex: 0 0 auto;
+  width: 26px; height: 26px; border-radius: 50%; object-fit: cover;
+  background: var(--surface-2); color: var(--muted); font-size: 13px; font-weight: var(--fw-strong);
+}
+.mp-av.big { width: 64px; height: 64px; font-size: 20px; }
+.mp-av.init { color: var(--text); }
+
+/* layout: side column (players, cameras, profile, admin) and main area */
+.mp-body {
+  min-height: 0; display: grid; gap: 12px; overflow: hidden;
+  grid-template-columns: clamp(240px, 24vw, 360px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+.mp-side { min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.mp-players-card { flex: 0 0 auto; min-height: 0; display: flex; flex-direction: column; }
+.mp-folds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: start; }
+.mp-folds > .hidden { display: none; }
+.mp-folds .mp-fold { min-width: 0; }
+.mp-players { display: flex; flex-direction: column; gap: 2px; overflow: auto; min-height: 0; }
+.mp-prow { display: flex; align-items: center; gap: 6px; min-height: 32px; flex-wrap: wrap; }
+.mp-pname { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-tag { color: var(--muted); font-size: 13px; }
+.mp-crown { color: var(--gold); display: inline-flex; width: 16px; height: 16px; }
+.mp-crown svg { width: 16px; height: 16px; }
+.mp-rank { color: var(--muted); min-width: 22px; }
+.mp-ico { width: 16px; height: 16px; color: var(--muted); flex: 0 0 auto; }
+.mp-ico.on { color: var(--raise); }
+.mp-slash { stroke: var(--fold); stroke-width: 2.4; stroke-linecap: round; fill: none; }
+.mp-prow .mp-btn.small { min-height: 30px; font-size: 13px; padding: 0 8px; }
+
+.mp-cam-card { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.mp-cam-ctl { display: flex; flex-wrap: wrap; gap: 6px; }
+.mp-cam-ctl:empty { display: none; }
+.mp-compat { min-height: 36px; font-size: 14px; color: var(--muted); }
+
+/* camera tiles: landscape (16:9), width-driven; the column stacks them and scrolls only when full */
+.mp-cams {
+  flex: 1 1 0; min-height: 0; overflow: hidden; align-content: start; justify-content: start;
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-rows: 1fr; gap: 8px;
+}
+.mp-tile {
+  position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden;
+  border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--surface-2);
+}
+.mp-tile.me { border: 2px solid var(--call); }
+.mp-tile video, .mp-relay {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  display: none; background: var(--bg);
+}
+.mp-tile.cam-on video { display: block; }
+.mp-tile.relay.cam-on .mp-relay { display: block; }
+.mp-tile-init {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  color: var(--muted); font-size: 22px; font-weight: var(--fw-strong);
+}
+.mp-tile-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.mp-tile-letter { font-size: 56px; line-height: 1; color: rgb(255 255 255 / 0.92); font-weight: var(--fw-strong); }
+.mp-tile.cam-on .mp-tile-init { display: none; }
+.mp-tile-top {
+  position: absolute; top: 6px; left: 6px; right: 6px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; pointer-events: none;
+}
+.mp-tile-name, .mp-tile-status {
+  max-width: 100%; padding: 1px 6px; border-radius: 4px; background: var(--bg);
+  font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mp-tile-status { color: var(--muted); }
+.mp-tile-acts { position: absolute; right: 6px; bottom: 6px; display: flex; gap: 6px; }
+
+/* big camera and mic buttons on the local tile: always visible, 44px touch targets, 24px icons */
+.mp-tbtn {
+  width: 44px; height: 44px; min-width: 44px; padding: 0; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer;
+  border: 2px solid var(--line); background: var(--bg); color: var(--text);
+}
+.mp-tbtn svg { width: 24px; height: 24px; }
+.mp-tbtn .mp-slash { stroke: currentColor; stroke-width: 2.4; }
+.mp-tbtn:hover { border-color: var(--text); }
+.mp-tbtn:active { transform: scale(0.94); }
+.mp-tbtn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.mp-tbtn.on { background: var(--raise); border-color: var(--raise); color: var(--suit-ink); }
+.mp-tbtn.off { background: var(--bg); border-color: var(--fold); color: var(--fold); }
+
+/* small, non-interactive status icons on remote tiles */
+.mp-ind {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 50%; background: var(--bg); color: var(--fold);
+}
+.mp-ind.on { color: var(--raise); }
+.mp-ind .mp-ico { width: 18px; height: 18px; }
+
+.mp-fold { padding: 0; }
+.mp-fold > summary { cursor: pointer; padding: 10px 12px; font-weight: var(--fw-strong); min-height: 44px; display: flex; align-items: center; }
+.mp-fold > div { padding: 0 12px 12px; }
+.mp-admin { display: flex; flex-direction: column; gap: 8px; }
+.mp-admin .mp-btn { width: 100%; }
+.mp-admin .mp-row .mp-btn { width: auto; }
+.mp-admin select { min-height: 44px; flex: 1 1 120px; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font: inherit; padding: 0 8px; }
+
+/* lobby */
+.mp-main { min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.mp-lobby { min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+.mp-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: end; }
+.mp-stacks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.mp-stackrow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mp-stackrow input { width: 120px; }
+.mp-botform, .mp-botedit { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 10px; align-items: end; margin-top: 10px; }
+.mp-botedit { grid-template-columns: minmax(0, 1fr); padding-top: 10px; border-top: 1px solid var(--line); }
+.mp-botedit .mp-row { gap: 8px; }
+
+/* table */
+.mp-tablev {
+  min-height: 0; height: 100%; display: grid; gap: 6px;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+}
+.mp-status { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--muted); }
+.mp-pot { color: var(--text); font-weight: var(--fw-strong); }
+.mp-table-wrap { min-height: 0; display: grid; place-items: center; box-sizing: border-box; padding-top: 26px; } /* room for the top seat's face-down cards (.mp-backs sit 20px above the plate) */
+.mp-table {
+  position: relative; height: 100%; max-width: 100%; width: auto;
+  aspect-ratio: 16 / 9; container-type: inline-size;
+}
+.mp-felt {
+  position: absolute; inset: 7% 5%; border-radius: 50%;
+  background: var(--felt); border: 2px solid var(--felt-edge);
+}
+.mp-center {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 8px; width: 70%;
+}
+.mp-board { display: flex; gap: 6px; justify-content: center; }
+.mp-seats, .mp-bets { position: absolute; inset: 0; }
+.mp-bets { pointer-events: none; }
+.mp-bet {
+  position: absolute; transform: translate(-50%, -50%); white-space: nowrap;
+  padding: 2px 8px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line);
+  color: var(--text); font-size: 14px; font-weight: var(--fw-strong);
+}
+.mp-seat {
+  position: absolute; transform: translate(-50%, -50%);
+  width: clamp(92px, 15cqi, 136px);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px; border-radius: var(--r-md); border: 2px solid var(--hl, var(--line));
+  background: var(--surface); text-align: center;
+}
+.mp-seat.bot { cursor: help; }
+.mp-seat.folded { opacity: 0.3; }
+/* active seat: bright gold border and glow, a countdown ring drawn around it (--p = share of time left),
+   and a slow pulse. The pulse is removed for reduced motion; the ring still shows the time. */
+.mp-seat.turn {
+  border: 2px solid var(--gold); z-index: 2;
+  box-shadow: 0 0 0 3px rgb(var(--gold-rgb, 230 180 60) / 0.35), 0 0 22px rgb(var(--gold-rgb, 230 180 60) / 0.6);
+  animation: mp-turn-pulse 1.6s ease-in-out infinite;
+}
+.mp-seat.turn::before {
+  content: ""; position: absolute; inset: -7px; border-radius: calc(var(--r-md) + 7px); pointer-events: none;
+  padding: 4px; background: conic-gradient(var(--gold) calc(var(--p, 1) * 360deg), transparent 0);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+}
+@keyframes mp-turn-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgb(var(--gold-rgb, 230 180 60) / 0.3), 0 0 16px rgb(var(--gold-rgb, 230 180 60) / 0.45); }
+  50% { box-shadow: 0 0 0 5px rgb(var(--gold-rgb, 230 180 60) / 0.15), 0 0 28px rgb(var(--gold-rgb, 230 180 60) / 0.75); }
+}
+/* winners (every pot, every winner): gold ring and green glow for ~2 s, emphasised name and stack, and a
+   '+amount' that rises and fades. Only transform, opacity and box-shadow move, so nothing reflows. */
+.mp-seat.winner { border: 2px solid var(--gold); z-index: 3; animation: mp-win-glow 2s ease-in-out 1 both; }
+.mp-seat.winner::after {
+  content: ""; position: absolute; inset: -5px; border-radius: calc(var(--r-md) + 5px); pointer-events: none;
+  border: 2px solid var(--gold); animation: mp-win-ring 2s ease-out 1 both;
+}
+.mp-seat.winner .mp-name { color: var(--gold); }
+.mp-seat.winner .mp-stack { animation: mp-win-pop 2s ease-out 1 both; }
+.mp-gain {
+  position: absolute; left: 50%; top: 0; pointer-events: none; white-space: nowrap; z-index: 4;
+  color: #8ff0b4; font-weight: var(--fw-strong); font-size: 15px; text-shadow: 0 1px 4px rgb(0 0 0 / 0.8);
+  opacity: 0; animation: mp-gain-pop 2s ease-out 1 both;
+}
+@keyframes mp-win-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(111 211 154 / 0), 0 0 0 rgb(111 211 154 / 0); }
+  50% { box-shadow: 0 0 0 3px rgb(230 180 60 / 0.35), 0 0 24px rgb(111 211 154 / 0.6); }
+}
+@keyframes mp-win-ring {
+  0% { opacity: 0; transform: scale(0.94); }
+  35% { opacity: 1; transform: scale(1.03); }
+  100% { opacity: 0.5; transform: scale(1); }
+}
+@keyframes mp-win-pop {
+  0%, 100% { transform: scale(1); }
+  40% { transform: scale(1.12); }
+}
+@keyframes mp-gain-pop {
+  0% { opacity: 0; transform: translate(-50%, 8px) scale(0.85); }
+  20% { opacity: 1; transform: translate(-50%, -6px) scale(1.05); }
+  75% { opacity: 1; transform: translate(-50%, -16px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -22px) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mp-seat.winner, .mp-seat.winner::after, .mp-seat.winner .mp-stack, .mp-gain { animation: none; }
+  .mp-gain { opacity: 1; transform: translate(-50%, -16px); }
+}
+.mp-seat.me.turn { border-color: var(--gold); }
+.mp-seat.folded.turn { opacity: 0.45; }
+.mp-seat-top { display: flex; gap: 4px; align-items: center; justify-content: center; min-height: 20px; }
+.mp-seat-who { display: flex; align-items: center; gap: 4px; max-width: 100%; min-width: 0; }
+.mp-seat-who .mp-name, .mp-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-strong); }
+.mp-pos { padding: 0 6px; border-radius: 4px; font-size: 13px; font-weight: var(--fw-strong); border: 1px solid var(--call); color: var(--call); }
+.mp-pos.btn { border-color: var(--gold); color: var(--gold); }
+.mp-dealer {
+  width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--gold); color: var(--suit-ink); font-size: 13px; font-weight: var(--fw-strong);
+}
+.mp-seat .mp-stack { color: var(--text); font-size: 15px; font-weight: var(--fw-strong); }
+.mp-last { font-size: 13px; color: var(--muted); }
+.mp-style { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 0 6px; border-radius: 999px; font-size: 13px; background: var(--surface-2); color: var(--text); }
+.mp-style::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.mp-style.st-tight::before { background: var(--style-tight); }
+.mp-style.st-loose::before { background: var(--style-loose); }
+.mp-style.st-aggressive::before { background: var(--style-aggressive); }
+.mp-style.st-passive::before { background: var(--style-passive); }
+.mp-style.st-balanced::before { background: var(--style-balanced); }
+.mp-mini { display: flex; gap: 3px; margin-top: 2px; }
+.mp-tip {
+  position: absolute; z-index: 5; pointer-events: none;
+  transform: translate(-50%, calc(-100% - 10px)); width: max-content; max-width: min(280px, 80cqi);
+  padding: 8px 10px; border-radius: var(--r-md); border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--text); font-size: 14px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.mp-tip-blurb { color: var(--muted); }
+.mp-tip-stack { color: var(--text); font-weight: var(--fw-strong); }
+/* the result banner floats at the top of the table, clear of the seats and the board */
+.mp-banner {
+  position: absolute; top: 40px; left: 50%; transform: translateX(-50%); z-index: 26; pointer-events: none;
+  max-width: 92%; padding: 6px 12px; border-radius: var(--r-md); text-align: center; font-size: 13px;
+  background: var(--bg); border: 1px solid var(--gold); box-shadow: 0 6px 18px rgb(0 0 0 / 0.4);
+}
+.mp-raise-bb { font-size: 13px; font-weight: var(--fw-strong); color: var(--gold); white-space: nowrap; min-width: 0; }
+.mp-win { font-weight: var(--fw-strong); }
+/* mid-hand show: the seat of a shower whose cards only folded and out viewers can see */
+.mp-shown-tag { display: inline-block; margin-top: 2px; padding: 0 5px; border-radius: 999px; font-size: 11px; line-height: 16px; color: var(--gold); border: 1px solid var(--gold); white-space: nowrap; }
+/* winner reveal: best five highlighted, the rest dimmed; shown until the next hand */
+.mp-card-face.best { outline: 2px solid var(--gold); outline-offset: 2px; box-shadow: 0 0 10px var(--gold); }
+.mp-card-face.dim { opacity: 0.4; }
+.mp-mini.win { display: flex !important; }
+.mp-wintag { display: block; margin-top: 3px; font-size: 12px; line-height: 1.25; color: var(--gold); font-weight: var(--fw-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.mp-next { color: var(--muted); font-size: 13px; }
+
+/* cards: large, readable, four-colour suits, flat */
+.mp-card-face {
+  position: relative; display: inline-flex; flex-direction: column; justify-content: space-between;
+  width: 44px; aspect-ratio: 5 / 7; padding: 4px 5px; flex: 0 0 auto;
+  border-radius: var(--r-sm); background: var(--card-face); border: 1px solid var(--line);
+  color: var(--suit-ink); font-weight: var(--fw-strong); line-height: 1;
+}
+.mp-card-face .r { font-size: 1em; }
+.mp-card-face .s { align-self: center; font-size: 1.2em; }
+.mp-card-face.s-h { color: var(--suit-red); }
+.mp-card-face.s-d { color: var(--suit-blue); }
+.mp-card-face.s-c { color: var(--suit-green); }
+.mp-card-face.s-s { color: var(--suit-ink); }
+.mp-card-face.back { background: var(--surface-2); border-color: var(--muted); }
+.mp-card-face.empty { background: transparent; border: 1px dashed var(--line); }
+.mp-card-face.mini { width: 28px; padding: 2px 3px; font-size: 13px; border-radius: 4px; }
+.mp-card-face.mini .s { font-size: 1.1em; }
+.mp-card-face.board { width: clamp(40px, 8cqi, 64px); font-size: clamp(15px, 2.2cqi, 20px); }
+.mp-card-face.board.empty { height: calc(clamp(40px, 8cqi, 64px) * 1.4); }
+.mp-card-face.hero { width: clamp(64px, 9dvh, 96px); font-size: clamp(18px, 2.6dvh, 26px); padding: 6px; border-radius: var(--r-md); }
+.mp-card-face.hero .s { font-size: 1.2em; }
+
+.mp-hero { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-height: 0; }
+.mp-hero-cards { display: flex; gap: 12px; justify-content: center; }
+.mp-hero-info { color: var(--muted); font-size: 14px; }
+
+.mp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* actions */
+.mp-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.mp-act {
+  min-height: clamp(48px, 7dvh, 60px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border: 0; border-radius: var(--r-md); padding: 6px;
+  color: var(--suit-ink); font: inherit; font-size: 16px; font-weight: var(--fw-strong); cursor: pointer;
+}
+.mp-act:active { transform: scale(0.98); }
+.mp-act:disabled { opacity: 0.4; cursor: not-allowed; }
+.mp-act.fold { background: var(--fold); }
+.mp-act.call { background: var(--call); }
+.mp-act.raise { background: var(--raise); }
+.mp-act kbd { font: inherit; font-size: 13px; padding: 0 6px; border-radius: 4px; background: var(--bg); color: var(--text); }
+.mp-raise-ctl {
+  display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 8px; align-items: center;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface);
+}
+.mp-raise-ctl input[type="range"] { width: 100%; accent-color: var(--gold); }
+.mp-raise-ctl input[type="number"] {
+  min-height: 40px; width: 100%; padding: 0 8px; text-align: center; box-sizing: border-box;
+  border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font: inherit; font-size: 15px; font-weight: var(--fw-strong);
+}
+.mp-raise-ctl input[type="number"]:disabled { opacity: .75; }
+.mp-quick { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.mp-quick .mp-btn.small { min-height: 40px; font-size: 14px; }
+
+/* modals */
+.mp-modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgb(var(--shadow-rgb) / 0.6); padding: 16px; }
+.mp-modal-box { width: min(440px, 100%); max-height: 88dvh; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+.mp-modal-box video { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: var(--r-sm); background: var(--bg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mp-seat.turn { animation: none; }
+  .mp-btn:active, .mp-act:active { transform: none; }
+}
+
+/* ===== layout v2 ===================================================================
+ * Toolbar (one row, 44px) on top. Below it: [camera column | main]. Main holds the table
+ * (min 300px tall, full width on portrait screens) and a dock with hero cards and F/C/R at its
+ * bottom. Players, profile and admin live in drawers. Cameras: a narrow column on desktop, a strip
+ * above the table on mid widths, and a toggled overlay on phones and short landscape screens. */
+.mp-app { position: relative; gap: 8px; padding: 8px 12px; }
+.mp-top { min-height: 44px; gap: 8px; }
+/* the Look button floats at top-left in a mode (theme.css, fixed 8px): the back arrow starts right of it */
+.mp-tbar { display: flex; align-items: center; gap: 12px; min-width: 0; margin-left: 56px; }
+.mp-tools { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.mp-ibtn {
+  width: 44px; height: 44px; padding: 0; border-radius: 50%; cursor: pointer;
+  display: inline-grid; place-items: center; font: inherit;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--text);
+}
+.mp-ibtn:hover { border-color: var(--muted); }
+.mp-ibtn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.mp-ibtn[aria-expanded="true"] { border-color: var(--gold); color: var(--gold); }
+.mp-ibtn-av .mp-av { width: 32px; height: 32px; font-size: 13px; }
+.mp-ibtn svg { width: 22px; height: 22px; }
+.mp-cam-toggle { display: none; }
+.mp-sound {
+  width: auto; border-radius: 999px; padding: 0 12px; gap: 6px; display: inline-flex; align-items: center;
+  background: var(--gold); border-color: var(--gold); color: var(--suit-ink); font-weight: var(--fw-strong);
+}
+.mp-sound.hidden { display: none !important; }
+.mp-sound-txt { font-size: 14px; white-space: nowrap; }
+
+.mp-scrim { display: none; position: absolute; inset: 0; z-index: 20; background: rgb(0 0 0 / 0.25); }
+.mp-scrim.open { display: block; }
+.mp-drawer {
+  display: none; position: absolute; z-index: 21; top: 52px; right: 12px;
+  width: min(360px, calc(100% - 24px)); max-height: calc(100% - 64px); overflow: auto;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
+  padding: 12px; box-shadow: 0 12px 32px rgb(0 0 0 / 0.4);
+}
+.mp-drawer.open { display: block; }
+.mp-drawer .mp-players-card { padding: 0; border: 0; background: none; }
+.mp-drawer .mp-fold { padding: 0; border: 0; background: none; }
+
+.mp-body {
+  min-height: 0; display: grid; gap: 10px; overflow: hidden;
+  grid-template-columns: clamp(190px, 21vw, 270px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+.mp-side { min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.mp-cam-card { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+.mp-cams {
+  flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: max-content; align-content: start; gap: 8px; overflow-y: auto; overflow-x: hidden;
+}
+.mp-cams .mp-tile { width: 100%; height: auto; aspect-ratio: 4 / 3; flex: none; }
+.mp-dbg { font-size: 12px; color: var(--muted); word-break: break-all; }
+
+.mp-main { min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.mp-tablev {
+  flex: 1 1 0; min-height: 0; height: 100%; display: grid; gap: 6px;
+  grid-template-rows: auto minmax(300px, 1fr) auto;
+}
+.mp-table-wrap { min-height: 0; min-width: 0; display: grid; place-items: center; }
+.mp-dock {
+  min-width: 0; display: grid; gap: 8px 12px; align-items: end;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.mp-hero { grid-row: 1 / span 2; grid-column: 1; }
+.mp-dock .mp-actions { grid-column: 2; grid-row: 1; }
+.mp-dock .mp-raise-ctl { grid-column: 2; grid-row: 2; min-width: 0; }
+.mp-card-face.hero { width: clamp(56px, 9dvh, 96px); }
+
+/* portrait screens (phones, tablets held upright): the table takes the full width */
+@media (max-aspect-ratio: 1 / 1) {
+  .mp-table { width: 100%; height: 100%; aspect-ratio: auto; }
+}
+/* phones: dock stacks (hero, actions, raise) */
+@media (max-width: 600px) and (min-height: 501px) {
+  .mp-dock { grid-template-columns: minmax(0, 1fr); }
+  .mp-hero { grid-row: auto; grid-column: 1; }
+  .mp-dock .mp-actions, .mp-dock .mp-raise-ctl { grid-column: 1; grid-row: auto; }
+}
+/* mid widths: cameras become a horizontal strip above the table */
+@media (min-width: 601px) and (max-width: 900px) and (min-height: 501px) {
+  .mp-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  .mp-cam-card { flex: none; padding: 6px 8px; }
+  .mp-cams { display: flex; flex-direction: row; overflow-x: auto; overflow-y: hidden; }
+  .mp-cams .mp-tile { flex: 0 0 auto; width: auto; height: 96px; }
+}
+/* phones and short landscape screens: cameras are an overlay that the toolbar toggles */
+@media (max-width: 600px), (max-height: 500px) {
+  .mp-body { grid-template-columns: minmax(0, 1fr); }
+  .mp-side {
+    display: none; position: absolute; z-index: 15; top: 52px; left: 12px; right: 12px;
+    max-height: min(62dvh, 440px);
+  }
+  .mp-side.open { display: flex; }
+  .mp-side .mp-cam-card { box-shadow: 0 12px 32px rgb(0 0 0 / 0.4); }
+  .mp-cams { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mp-cam-toggle { display: inline-grid; }
+  .mp-title { display: none; }
+  .mp-conn span:last-child { display: none; }
+  .mp-sound-txt { display: none; }
+  .mp-sound { width: 44px; padding: 0; justify-content: center; }
+}
+
+/* ---- phase 2: speaking ring, show my hand, chat, external call, LAN list ---- */
+.mp-tile.speaking { box-shadow: inset 0 0 0 3px var(--raise); }
+.mp-show { margin-top: 4px; min-width: 44px; }
+.mp-badge {
+  min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px;
+  background: var(--gold); color: var(--suit-ink); font-size: 13px; font-weight: var(--fw-strong);
+  display: inline-grid; place-items: center;
+}
+.mp-badge.hidden { display: none; }
+.mp-chat {
+  flex: 0 0 auto; display: flex; flex-direction: column; min-width: 0;
+  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface);
+}
+.mp-chat-head {
+  min-height: 40px; width: 100%; padding: 0 10px; display: flex; align-items: center; justify-content: space-between;
+  border: 0; background: none; color: var(--text); font: inherit; font-size: 14px; font-weight: var(--fw-strong); cursor: pointer;
+}
+.mp-chat-head[aria-expanded="true"] { color: var(--gold); }
+.mp-chat-body { display: flex; flex-direction: column; gap: 6px; padding: 0 8px 8px; min-width: 0; }
+.mp-chat-body.hidden { display: none; }
+.mp-chat-log { list-style: none; margin: 0; padding: 0; max-height: 132px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.mp-chat-log li { overflow-wrap: anywhere; }
+.mp-chat-log li.mine b { color: var(--raise); }
+.mp-chat-form { display: flex; gap: 6px; min-width: 0; }
+.mp-chat-form input {
+  flex: 1 1 auto; min-width: 0; min-height: 36px; padding: 0 8px; font: inherit; font-size: 14px;
+  border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--surface-2); color: var(--text);
+}
+.mp-chat-form .mp-btn { min-height: 36px; }
+.mp-ibtn.hidden { display: none; }
+.mp-lan { display: flex; flex-direction: column; gap: 6px; }
+.mp-lan-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mp-lan-url { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-size: 13px; color: var(--text); }
+
+
+/* narrow phones: smaller toolbar buttons; mid widths: a short chat log so the table keeps its height */
+@media (max-width: 360px) {
+  .mp-ibtn { width: 38px; height: 38px; }
+  .mp-tools { gap: 4px; }
+  .mp-conn { padding: 4px 8px; }
+}
+@media (min-width: 601px) and (max-width: 900px) and (min-height: 501px) {
+  .mp-chat-log { max-height: 56px; }
+}
+
+
+/* ---- layout fixes (re-measured with test/e2e-layout.js) ---- */
+/* phones and short landscape screens: the multiplayer view covers the screen (the site header is
+ * hidden here; the Menu button in the toolbar returns to the menu) */
+@media (max-width: 600px), (max-height: 500px) {
+  #mp-root { position: fixed; inset: 0; z-index: 40; height: 100dvh !important; background: var(--bg); }
+}
+/* phones: hero cards and actions side by side, raise controls below (table keeps its height) */
+@media (max-width: 600px) and (min-height: 501px) {
+  .mp-dock { grid-template-columns: auto minmax(0, 1fr); }
+  .mp-hero { grid-row: 1 / span 2; grid-column: 1; }
+  .mp-dock .mp-actions { grid-column: 2; grid-row: 1; }
+  .mp-dock .mp-raise-ctl { grid-column: 2; grid-row: 2; }
+}
+/* short screens (height up to 700): the table keeps 200px and takes the column width; the dock is compact */
+@media (max-height: 760px) and (min-height: 501px) {
+  .mp-table { aspect-ratio: auto; width: 100%; height: 100%; }
+  .mp-hero-info { display: none; }
+  .mp-quick .mp-btn.small { min-height: 32px; padding: 0 4px; }
+  .mp-card-face.hero { width: clamp(56px, 8dvh, 76px); }
+}
+
+/* ===== layout v3 =======================================================================
+ * Seats are placed and sized by layoutTable() in mp.js (ring of seats, detail levels lv0..lv3,
+ * bet chips beside their seat, no overlaps). Here: the table fills its box, the status line sits
+ * in the centre, and the dock sits under the table. Landscape phones (height <= 500px) have no
+ * toolbar row: the back button and the icon column float in the top corners, the felt is 66% of
+ * the width, the hero cards hang over its bottom edge, F/C/R sit bottom right, the raise controls
+ * open as a popover from R, and cameras and chat float as overlays. */
+.mp-tablev {
+  flex: 1 1 0; min-height: 0; height: 100%; position: relative;
+  display: grid; gap: 6px; grid-template-rows: minmax(0, 1fr) auto;
+}
+.mp-table-wrap { min-height: 0; min-width: 0; display: grid; place-items: center; }
+.mp-table { width: 100%; height: 100%; aspect-ratio: auto; }
+.mp-felt { position: absolute; inset: 6px; border-radius: 50%; }
+.mp-center { position: absolute; transform: translate(-50%, -50%); width: max-content; max-width: 84%; gap: 4px; }
+.mp-center .mp-status { justify-content: center; gap: 14px; font-size: 15px; }
+.mp-seat { transform: translate(-50%, -50%); padding: 6px; }
+.mp-seat .mp-stack { font-size: 15px; }
+/* detail levels set by layoutTable(): lv1 drops avatar, style tag and last action; lv2 drops mini
+   cards and cuts names to 6 characters; lv3 drops position badges (name and stack remain) */
+.mp-table.lv1 .mp-seat { padding: 4px 5px; }
+.mp-table.lv1 .mp-av, .mp-table.lv1 .mp-style, .mp-table.lv1 .mp-last { display: none; }
+.mp-table.lv2 .mp-mini { display: none; }
+.mp-table.lv2 .mp-name, .mp-table.lv3 .mp-name { max-width: 6ch; }
+.mp-table.lv3 .mp-seat { padding: 4px 5px; }
+.mp-table.lv3 .mp-seat-top, .mp-table.lv3 .mp-mini { display: none; }
+.mp-table.lv3 .mp-board { gap: 3px; flex-wrap: wrap; width: 100px; }
+.mp-table.lv3 .mp-center .mp-status { font-size: 13px; gap: 8px; }
+.mp-table.lv3 .mp-card-face.board { width: 28px; font-size: 13px; }
+.mp-table.lv3 .mp-card-face.board.empty { height: 40px; }
+/* lv4 (extra-compact, last resort): plates show only name and stack; text may drop to 11px here (the
+   only level allowed below 12px); board cards 22px; F/C/R keep their 44px tap size (not changed here) */
+.mp-table.lv4 .mp-seat { padding: 3px 4px; gap: 1px; border-width: 1px; }
+.mp-table.lv4 .mp-av, .mp-table.lv4 .mp-style, .mp-table.lv4 .mp-last, .mp-table.lv4 .mp-mini,
+.mp-table.lv4 .mp-seat-top, .mp-table.lv4 .mp-backs, .mp-table.lv4 .mp-shown-tag { display: none; }
+.mp-table.lv4 .mp-name, .mp-table.lv4 .mp-seat .mp-stack { font-size: 11px; line-height: 1.2; }
+.mp-table.lv4 .mp-name { max-width: 5ch; }
+.mp-table.lv4 .mp-bet { font-size: 11px; padding: 1px 6px; }
+.mp-table.lv4 .mp-board { gap: 2px; flex-wrap: wrap; width: 120px; }
+.mp-table.lv4 .mp-center .mp-status { font-size: 12px; gap: 6px; }
+.mp-table.lv4 .mp-card-face.board { width: 22px; font-size: 11px; }
+.mp-table.lv4 .mp-card-face.board.empty { height: 31px; }.mp-bet { transform: translate(-50%, -50%); }
+@media (min-height: 501px) and (max-height: 760px) {
+  #mp-root { padding: 12px 16px; }
+  .mp-tablev { grid-template-rows: minmax(200px, 1fr) auto; }
+}
+
+/* phones: the multiplayer root has no site padding (the screen is the table) */
+@media (max-width: 600px) { #mp-root { padding: 0; } }
+
+/* landscape phones */
+@media (max-height: 500px) {
+  #mp-root { padding: 0; }
+  .mp-app { display: block; padding: 0; gap: 0; height: 100%; }
+  .mp-card-face.board { width: 38px; font-size: 15px; }
+  .mp-card-face.board.empty { height: 53px; }
+  .mp-board { gap: 4px; }
+  .mp-entry { height: 100%; padding-top: 56px; box-sizing: border-box; }
+  .mp-lobby { padding-top: 56px; gap: 6px; }
+  .mp-body { position: relative; height: 100%; gap: 0; grid-template-rows: minmax(0, 1fr); }
+  .mp-main { height: 100%; }
+
+  /* toolbar: back and conn pill top-left, icon column top-right, all overlays */
+  .mp-top { position: absolute; top: 8px; left: 8px; right: 8px; height: 0; min-height: 0; display: block; pointer-events: none; z-index: 12; }
+  .mp-tbar { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 8px; pointer-events: auto; }
+  .mp-tools { position: absolute; right: 0; top: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: auto; }
+  .mp-ibtn { width: 44px; height: 44px; }
+  .mp-conn { padding: 3px 8px; }
+  .mp-sound { width: 40px; }
+
+  /* table: the felt fills the area above the dock; the dock is a real bottom row (hero cards centred,
+     actions at the right), so the table area is the viewport minus the dock and the felt scales to it */
+  .mp-tablev { height: 100%; grid-template-rows: minmax(0, 1fr) auto; gap: 0; }
+  .mp-table-wrap { height: auto; min-height: 0; padding-top: 0; }
+  .mp-dock { position: relative; inset: auto; display: flex; justify-content: center; align-items: flex-end; min-width: 0; padding: 0 0 4px; }
+  .mp-dock .mp-hero { position: static; transform: none; left: auto; top: auto; grid-row: auto; grid-column: auto; }
+  .mp-card-face.hero { width: 44px; font-size: 19px; padding: 4px 5px; }
+  .mp-dock .mp-hero-info { display: none; }
+  .mp-dock .mp-show { position: absolute; right: calc(50% + 62px); top: 0; margin: 0; }
+  .mp-dock .mp-actions { position: absolute; right: 8px; bottom: 8px; width: 272px; gap: 6px; grid-column: auto; grid-row: auto; }
+  .mp-act { min-height: 44px; }
+  .mp-act kbd { display: none; }
+  .mp-dock .mp-raise-ctl { display: none; position: absolute; right: 8px; bottom: 58px; width: 300px; grid-column: auto; grid-row: auto; grid-template-columns: minmax(0, 1fr) 84px; }
+  .mp-dock.raise-open .mp-raise-ctl { display: grid; }
+  .mp-quick { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  .mp-quick .mp-btn.small { min-height: 36px; padding: 0 4px; font-size: 13px; }
+
+  /* cameras: a floating overlay opened by the camera button; chat: a bubble bottom-left */
+  .mp-side { display: contents; }
+  .mp-side .mp-cam-card {
+    display: none; position: absolute; top: 8px; right: 56px; z-index: 15;
+    width: min(300px, 42%); max-height: calc(100% - 16px); box-shadow: 0 12px 32px rgb(0 0 0 / 0.4);
+  }
+  .mp-side.open .mp-cam-card { display: flex; }
+  .mp-side .mp-chat { position: absolute; left: 8px; bottom: 8px; z-index: 15; width: auto; border-radius: 999px; }
+  .mp-chat:has(.mp-chat-body:not(.hidden)) { width: min(280px, 50%); border-radius: var(--r-md); }
+  .mp-chat-head { min-height: 40px; white-space: nowrap; gap: 8px; }
+  .mp-drawer { top: 8px; right: 56px; width: min(340px, 50%); max-height: calc(100% - 16px); }
+}
+
+/* the single-player stylesheet styles any element with class board (position, transform); the multiplayer cards are plain flow items */
+.mp-card-face.board, .mp-card-face.hero, .mp-card-face.mini { position: relative; left: auto; top: auto; transform: none; }
+
+/* raise presets: the four buttons share the box width; labels wrap instead of spilling out */
+.mp-quick { min-width: 0; }
+.mp-quick .mp-btn { min-width: 0; padding: 0 2px; font-size: 13px; line-height: 1.1; white-space: normal; }
+.mp-raise-ctl, .mp-raise-ctl input[type="number"] { min-width: 0; }
+
+/* phones (portrait): the raise panel takes the full dock width on its own row under hero and actions */
+@media (max-width: 600px) and (min-height: 501px) {
+  .mp-dock .mp-raise-ctl { grid-column: 1 / -1; grid-row: 3; }
+}
+
+/* desktop and tablet widths: the raise amount is one row (slider, amount, presets); phones keep two rows */
+@media (min-height: 501px) and (max-height: 760px) and (min-width: 601px) {
+  .mp-raise-ctl { display: flex; align-items: center; gap: 8px; }
+  .mp-raise-ctl input[type="range"] { flex: 0 1 200px; min-width: 0; }
+  .mp-raise-ctl input[type="number"] { width: 84px; flex: 0 0 auto; }
+  .mp-raise-ctl .mp-quick { display: flex; flex: 0 0 auto; gap: 4px; grid-column: auto; }
+  .mp-raise-ctl .mp-quick .mp-btn.small { width: 56px; min-height: 36px; padding: 0; font-size: 13px; }
+}
+
+/* paused game: a big banner over the table; the host sees the Resume button in the admin drawer */
+#mp-paused:not(.hidden) {
+  position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 30; pointer-events: none;
+  margin: 0; padding: 14px 34px; border-radius: 14px; background: rgb(15 13 10 / 0.86); border: 2px solid var(--gold, #c9a14a);
+  color: var(--gold, #c9a14a); font-family: var(--font-display, inherit); font-weight: 700; letter-spacing: 0.04em;
+  font-size: clamp(1.4rem, 4.2vw, 3rem); text-align: center; white-space: nowrap;
+}
+
+/* Deal animation layer: absolute, never affects layout; card backs fly with transform/opacity. */
+.mp-deal-layer { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.mp-deal-card {
+  position: absolute; left: 0; top: 0; width: 22px; height: 31px; border-radius: 4px;
+  background: linear-gradient(135deg, #1d4ed8, #1e3a8a); border: 1px solid rgba(255, 255, 255, .5);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .4); opacity: 0; will-change: transform, opacity;
+}
+/* Spectators (busted players) get no action controls, only the note. */
+.mp-dock.spectating .mp-actions,
+.mp-dock.spectating .mp-raise-ctl,
+.mp-dock.spectating .mp-show { display: none; }
+.mp-out-note {
+  margin: 0 0 6px; padding: 6px 10px; border-radius: 8px; text-align: center;
+  background: rgba(0, 0, 0, .45); color: #fff; font-size: 14px;
+}
+
+/* ===== v4 (mp redesign) =====================================================================
+ * Header: a minimal row (title and connection on the left; icons and the back arrow on the right).
+ * Wide screens (>= 1100px and >= 600px tall): cameras in the left column, the table in the middle,
+ * and a right-hand panel with a pill tab row (Players, Chat, Profile, Admin). Narrow and short
+ * screens keep the overlays opened from the header icons. Nothing scrolls. */
+.mp-panel { display: contents; }
+.mp-tabs { display: none; }
+.mp-tab { display: none; }
+
+@media (min-width: 1100px) and (min-height: 600px) {
+  #mp-root { padding: 10px 14px; }
+  .mp-app { padding: 0; gap: 10px; }
+  .mp-top { min-height: 40px; }
+  .mp-title { font-size: 17px; }
+  .mp-conn { border: 0; padding: 0; }
+  .mp-ibtn { width: 40px; height: 40px; }
+  .mp-body {
+    grid-template-columns: clamp(268px, 19vw, 300px) minmax(0, 1fr) clamp(250px, 20vw, 300px);
+    gap: 12px;
+  }
+  .mp-side { display: flex; position: static; }
+  .mp-side .mp-cam-card { box-shadow: none; }
+  .mp-cams { overflow: hidden; }
+  .mp-cams .mp-tile { width: 100%; height: 100%; aspect-ratio: auto; }
+
+  .mp-panel {
+    display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden;
+    border: 1px solid var(--line); border-radius: var(--r-lg, 16px); background: var(--surface);
+  }
+  .mp-tabs {
+    display: flex; gap: 2px; padding: 5px; margin: 8px 8px 0; border-radius: 999px;
+    background: var(--surface-2); flex: 0 0 auto;
+  }
+  .mp-tab {
+    display: inline-flex; flex: 1 1 0; min-width: 0; min-height: 36px; align-items: center; justify-content: center; gap: 5px;
+    padding: 0 6px; border: 0; border-radius: 999px; background: none; color: var(--muted);
+    font: inherit; font-size: 13px; font-weight: var(--fw-strong); cursor: pointer; white-space: nowrap;
+  }
+  .mp-tab svg { width: 17px; height: 17px; flex: 0 0 auto; }
+  .mp-tab:hover { color: var(--text); }
+  .mp-tab[aria-selected="true"] { background: var(--bg); color: var(--text); box-shadow: inset 0 -2px 0 var(--gold); }
+  .mp-tab.hidden { display: none; }
+  .mp-tab:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .mp-panel .mp-drawer {
+    display: none; position: static; width: auto; max-height: none; overflow: hidden;
+    border: 0; background: none; box-shadow: none; padding: 10px 12px 12px; min-height: 0; flex: 1 1 0;
+  }
+  .mp-panel .mp-drawer.open { display: flex; flex-direction: column; gap: 8px; }
+  .mp-scrim { display: none !important; }
+  .mp-panel .mp-chat-drawer.open { justify-content: flex-end; }
+  .mp-panel .mp-chat { border: 0; background: none; flex: 1 1 auto; min-height: 0; justify-content: flex-end; }
+  .mp-panel .mp-chat-head { min-height: 32px; padding: 0 2px; cursor: default; }
+  .mp-panel .mp-chat-head span { font-size: 14px; }
+  .mp-panel .mp-chat-body { display: flex !important; flex: 1 1 auto; min-height: 0; padding: 0; justify-content: flex-end; }
+  .mp-chat-log { max-height: none; flex: 1 1 auto; min-height: 0; overflow: hidden; justify-content: flex-end; gap: 6px; font-size: 14px; }
+  .mp-chat-log li { background: var(--surface-2); border-radius: var(--r-sm); padding: 5px 8px; }
+  .mp-panel .mp-players { overflow: hidden; }
+  .mp-panel .mp-folds, .mp-panel .mp-fold { min-height: 0; }
+  .mp-panel .mp-profile-details > summary { display: none; }
+  .mp-panel .mp-admin-details > summary { display: none; }
+  .mp-panel .mp-admin-details, .mp-panel .mp-profile-details { display: block; }
+  .mp-panel .mp-drawer[data-drawer="profile"] .mp-fold > div,
+  .mp-panel .mp-drawer[data-drawer="admin"] .mp-fold > div { padding: 0; }
+}
+
+/* table: bottom action bar with the values; pot as a pill; big hero cards */
+@media (min-width: 1100px) and (min-height: 600px) {
+  .mp-dock {
+    padding: 10px 12px; border-radius: var(--r-lg, 16px); background: var(--surface);
+    border: 1px solid var(--line); grid-template-columns: auto minmax(0, 1fr); gap: 10px 14px;
+  }
+  .mp-hero { grid-row: 1 / span 2; }
+  .mp-hero-cards { gap: 8px; }
+  .mp-card-face.hero { width: clamp(64px, 10dvh, 100px); font-size: clamp(20px, 3dvh, 30px); }
+  .mp-actions { gap: 10px; }
+  .mp-act { min-height: clamp(52px, 8dvh, 64px); font-size: 17px; border-radius: var(--r-md); }
+  .mp-act span { font-variant-numeric: tabular-nums; }
+  .mp-raise-ctl { background: var(--bg); border: 0; padding: 0; }
+  .mp-status .mp-pot {
+    padding: 3px 12px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); font-size: 15px;
+  }
+  .mp-card-face.board { width: clamp(44px, 7.5cqi, 72px); font-size: clamp(16px, 2.4cqi, 24px); }
+}
+
+/* face-down cards peeking above each live seat */
+.mp-backs { position: absolute; left: 50%; top: -20px; transform: translateX(-50%); display: flex; gap: 3px; pointer-events: none; }
+.mp-backs i {
+  display: block; width: 20px; height: 28px; border-radius: 4px; border: 1px solid var(--muted);
+  background: var(--surface-2) repeating-linear-gradient(135deg, transparent 0 4px, rgb(255 255 255 / 0.07) 4px 5px);
+}
+.mp-backs i:first-child { transform: rotate(-8deg); }
+.mp-backs i:last-child { transform: rotate(8deg); }
+.mp-seat.folded .mp-backs, .mp-seat.me .mp-backs { display: none; }
+.mp-table.lv3 .mp-backs i { width: 14px; height: 20px; }
+
+/* header on narrow screens: back arrow stays last (top-right) */
+.mp-home { margin-left: 4px; }
+.mp-only-narrow { display: inline-grid; }
+@media (min-width: 1100px) and (min-height: 600px) {
+  .mp-only-narrow { display: none; }
+}
+
+/* no scrolling: the camera column and the lobby never overflow.
+ * Desktop widths: tiles are sized by layoutCams() (camLayout) and the column clips, never scrolls.
+ * Short screens (height <= 700px): the host card flows into two CSS columns so the lobby fits. */
+.mp-cams { overflow: hidden; }
+@media (min-width: 901px) and (min-height: 501px) {
+  .mp-cams { overflow: hidden; }
+  .mp-cams .mp-tile { height: 100%; }
+}
+
+}
+
+/* tabs: only the selected tab shows its label (the four tabs fit the panel width) */
+@media (min-width: 1100px) and (min-height: 600px) {
+  .mp-tab span { display: none; }
+  .mp-tab[aria-selected="true"] span { display: inline; }
+  .mp-tab { flex: 0 0 auto; padding: 0 10px; }
+  .mp-tab[aria-selected="true"] { flex: 1 1 auto; }
+}
+/* landscape phones: the floating icon column sits over the top-right; the lobby keeps clear of it,
+ * and the host card runs in three columns so the lobby fits the height */
+@media (max-height: 500px) {
+  .mp-lobby { padding-right: 60px; }
+}
+
+/* ===== round 3: lobby, cams and chat without scrolling =================================
+ * Short screens (height <= 700px): the lobby is two columns (left: the Start button or the waiting
+ * card; right: the host card with two pages, Game and Bots). One page is visible at a time and the
+ * bot list pages four rows at a time. Portrait phones: one column, host card then Start.
+ * Tall screens show the host card whole and no page tabs. */
+/* host card: Game | Bots tabs at every height, one page visible at a time (nothing stacks, nothing scrolls) */
+.mp-hpages { display: flex; gap: 4px; margin-bottom: 4px; }
+.mp-hpage { flex: 1 1 0; min-height: 34px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); font: inherit; font-size: 14px; font-weight: var(--fw-strong); cursor: pointer; }
+.mp-hpage[aria-selected="true"] { color: var(--text); border-color: var(--gold); }
+.mp-host[data-page="game"] .mp-page-bots, .mp-host[data-page="bots"] .mp-page-game { display: none; }
+@media (max-height: 700px) {
+  .mp-lobby { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 8px 12px; align-content: start; align-items: start; }
+  .mp-host { grid-column: 2; grid-row: 1 / span 2; min-width: 0; padding: 8px 10px; }
+  .mp-guest, #mp-start { grid-column: 1; grid-row: 1; }
+  #mp-start { min-height: 48px; }
+  .mp-host .mp-h { margin: 6px 0 4px; font-size: 15px; }
+  .mp-host .mp-field, .mp-host .mp-check { min-height: 36px; }
+  .mp-host .mp-grid2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px 10px; }
+  .mp-host .mp-botform, .mp-host .mp-botedit { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; margin-top: 6px; }
+  .mp-host .mp-botform .mp-btn { grid-column: 1 / -1; }
+  .mp-host .mp-botedit { grid-template-columns: minmax(0, 1fr); }
+  .mp-host .mp-prow { min-height: 30px; }
+  .mp-pager { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 4px; font-size: 14px; }
+  .mp-pager .mp-btn { min-height: 32px; min-width: 40px; }
+  .mp-lobby .mp-card.mp-guest { padding: 10px; }
+}
+@media (max-height: 700px) and (max-width: 600px) {
+  .mp-lobby { grid-template-columns: minmax(0, 1fr); }
+  .mp-host { grid-column: 1; grid-row: 1; }
+  #mp-start, .mp-guest { grid-column: 1; grid-row: 2; }
+  .mp-host .mp-botform { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@media (min-height: 701px) {
+  .mp-page { display: block; }
+}
+/* camera chip: "+N" for cameras that do not fit the column (tiles stay 4:3 and at least 240x180) */
+.mp-more { width: max-content; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; font-weight: var(--fw-strong); }
+.mp-more.hidden { display: none; }
+/* chat expand: a fixed-size panel with the last messages (12); no scroll */
+.mp-chat.expanded .mp-chat-log { height: 250px; flex: none; max-height: none; overflow: hidden; }
+.mp-chat-exp { min-height: 36px; min-width: 36px; padding: 0 8px; font-size: 16px; }
+/* landscape lobby: gutter on the left and bottom (the Start button was flush with the edge) */
+@media (max-height: 500px) {
+  .mp-lobby { padding-left: 12px; padding-bottom: 12px; }
+  /* landscape phones: the host card is three columns of settings, tighter rows */
+  .mp-host { padding: 6px 8px; }
+  .mp-host .mp-h { margin: 2px 0 2px; font-size: 14px; }
+  .mp-host .mp-grid2 { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px 8px; }
+  .mp-host .mp-field, .mp-host .mp-check { min-height: 30px; }
+  .mp-host .mp-field { font-size: 13px; }
+  .mp-host .mp-check { font-size: 14px; }
+  .mp-host .mp-hpage { min-height: 30px; }
+}
+
+/* Multiplayer v5: pause banner (outside the admin drawer), blinds chip, toast, RTT dot */
+.mp-tablev { position: relative; }
+.mp-paused .mp-table { opacity: .55; filter: saturate(.6); }
+.mp-paused .mp-dock .mp-actions { pointer-events: none; }
+.mp-pause-banner {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 20;
+  display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 92%;
+  padding: 14px 22px; border-radius: 12px; background: rgba(12, 14, 20, .92); color: #f4f4f4;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .45); font-size: clamp(18px, 3vw, 28px); text-align: center;
+}
+.mp-pause-banner.hidden { display: none; }
+.mp-toast {
+  position: absolute; top: 6px; left: 50%; transform: translateX(-50%); z-index: 25; pointer-events: none;
+  max-width: 90%; padding: 6px 12px; border-radius: 999px; background: rgba(0, 0, 0, .72); color: #fff;
+  font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mp-toast.hidden { display: none; }
+.mp-blinds { font-variant-numeric: tabular-nums; padding: 1px 8px; border-radius: 999px; background: rgba(255, 255, 255, .08); white-space: nowrap; }
+.mp-blinds.hidden { display: none; }
+.mp-rtt { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.mp-rtt.hidden { display: none; }
+.mp-dot.rtt-good { background: #3ecf6e; }
+.mp-dot.rtt-mid { background: #e6c229; }
+.mp-dot.rtt-bad { background: #e5484d; }
+.mp-tbar .mp-blinds { min-width: 0; max-width: 42vw; overflow: hidden; text-overflow: ellipsis; font-size: 12px; padding: 1px 7px; }
+.mp-tbar .mp-conn { min-width: 0; }
+/* landscape phones: amounts are in BB ("12.5 BB"), so bet chips are kept small to stay clear of the seats and board */
+@media (max-height: 500px) {
+  .mp-bet { font-size: 12px; padding: 1px 6px; }
+}
+/* landscape phones: the table is short and the seats need the top band, so the blinds chip is hidden */
+@media (max-height: 500px) {
+  .mp-tbar .mp-blinds { display: none; }
+}
+@media (max-width: 520px) {
+  .mp-tbar .mp-blinds { display: none; }   /* phones: header has no room; the chip returns from 521px up */
+  .mp-rtt #mp-rtt { display: none; }
+  .mp-rtt { margin-left: 4px; }
+}
+/* ==== B: chat ==== */
+/* One fixed layer on <body>: toast, bubbles, spectator bench, emoji picker. Never affects layout or scroll. */
+.mp-fx { position: fixed; inset: 0; z-index: 60; pointer-events: none; overflow: visible; }
+.mp-chat-toast {
+  position: fixed; top: 8px; left: 50%; transform: translate(-50%, -6px); z-index: 61; pointer-events: none;
+  max-width: min(90vw, 360px); padding: 5px 12px; border-radius: 999px; background: rgba(12, 14, 20, .86); color: #fff;
+  font-size: 12px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  opacity: 0; transition: opacity .25s ease, transform .25s ease; box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
+}
+.mp-chat-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.mp-emoji { width: 48px; height: 48px; vertical-align: -14px; object-fit: contain; image-rendering: auto; }
+.mp-emoji.big { width: 72px; height: 72px; vertical-align: middle; }
+/* Unicode emoji runs (chat list and bubbles): sized text, with color emoji fonts first */
+.mp-uemo { font-size: 1.9em; line-height: 1; vertical-align: -0.1em; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; }
+.mp-uemo.big { font-size: 3.4em; }
+.mp-chat-form .mp-emo-btn { min-width: 36px; min-height: 36px; padding: 0 6px; font-size: 16px; }
+.mp-chat-form .mp-emo-btn[aria-expanded="true"] { color: var(--gold); }
+.mp-bub {
+  position: absolute; max-width: 170px; padding: 4px 8px; border-radius: 10px; z-index: 1;
+  background: rgba(12, 14, 20, .9); color: #f4f4f4; font-size: 12px; line-height: 1.25;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .4); overflow: hidden; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  opacity: 0; transform: translate(-50%, -100%) translateY(4px); transition: opacity .25s ease, transform .25s ease;
+}
+.mp-bub.on { opacity: 1; transform: translate(-50%, -100%); }
+.mp-bub.below { transform: translate(-50%, 0) translateY(-4px); }
+.mp-bub.below.on { transform: translate(-50%, 0); }
+.mp-bub.cam { transform: translate(0, 0) translateY(4px); max-width: 150px; font-size: 11px; }
+.mp-bub.cam.on { transform: none; }
+.mp-bub .mp-emoji { width: 16px; height: 16px; vertical-align: -3px; }
+.mp-bub .mp-emoji.big { width: 22px; height: 22px; }
+.mp-bench { position: fixed; display: flex; gap: 4px; pointer-events: none; }
+.mp-bench-chip { position: relative; width: 26px; height: 26px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(0, 0, 0, .45); }
+.mp-bench-chip .mp-av { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; }
+.mp-emo-pop {
+  position: fixed; box-sizing: border-box; width: 224px; height: 352px; padding: 8px; overflow: hidden;
+  display: flex; flex-direction: column; gap: 6px; pointer-events: auto; z-index: 70;
+  background: var(--surface, #1b1f2a); color: var(--text, #f4f4f4); border: 1px solid var(--line, rgba(255, 255, 255, .14));
+  border-radius: 12px; box-shadow: 0 10px 28px rgba(0, 0, 0, .45); font-size: 12px;
+}
+.mp-emo-pop.hidden { display: none; }
+.mp-emo-top { display: flex; justify-content: space-between; align-items: center; height: 18px; }
+.mp-emo-top span { font-size: 11px; opacity: .75; font-variant-numeric: tabular-nums; }
+.mp-emo-quick { display: grid; grid-template-columns: repeat(8, 1fr); height: 78px; flex: 0 0 auto; }
+.mp-emo-q {
+  height: 26px; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 6px;
+  font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; font-size: 18px; line-height: 26px;
+}
+.mp-emo-q:hover, .mp-emo-q:focus-visible { background: rgba(255, 255, 255, .12); outline: none; }
+.mp-emo-grid { display: grid; grid-template-columns: repeat(4, 38px); grid-template-rows: repeat(4, 36px); gap: 2px; justify-content: center; height: 150px; overflow: hidden; }
+.mp-emo-cell {
+  width: 38px; height: 36px; padding: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 0; border-radius: 8px; background: rgba(255, 255, 255, .07); color: inherit; cursor: pointer;
+}
+.mp-emo-cell img { width: 44px; height: 44px; object-fit: contain; }
+.mp-emo-cell span { display: none; max-width: 100%; font-size: 8px; line-height: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-emo-cell.del { outline: 1px dashed #e5484d; outline-offset: -2px; }
+.mp-emo-cell.del img { width: 36px; height: 36px; }
+.mp-emo-cell.del span { display: block; }
+.mp-emo-cell.add { font-size: 20px; line-height: 1; }
+.mp-emo-bar { display: flex; justify-content: flex-end; height: 30px; }
+.mp-emo-bar .mp-btn { min-height: 30px; }
+.mp-emo-msg { margin: 0; height: 14px; font-size: 11px; line-height: 14px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#mp-emo-file { display: none; }
+@media (max-width: 520px) {
+  .mp-bub { max-width: 130px; font-size: 11px; }
+  .mp-bub.cam { max-width: 120px; font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mp-chat-toast, .mp-bub { transition: none; }
+}
+/* Tab row (wide): four or five tabs share a ~270 px panel. Labels shrink and ellipsize instead of overlapping. */
+@media (min-width: 1100px) and (min-height: 600px) {
+  .mp-tabs { gap: 0; padding: 4px; }
+  .mp-tab { gap: 3px; padding: 0 4px; font-size: 12px; min-width: 0; overflow: hidden; }
+  .mp-tab svg { width: 15px; height: 15px; }
+  .mp-tab span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+}
+/* ==== /B ==== */
+/* ==== A: spectators/cams ==== */
+.mp-role { display: inline-block; font-size: 12px; line-height: 1; padding: 3px 5px; border-radius: 4px; background: rgba(0,0,0,.55); color: #fff; margin-right: 4px; white-space: nowrap; }
+.mp-role.spec { background: #6b4fa0; }
+.mp-role.player { background: #2f6f4f; }
+.mp-tile-stack { margin-left: auto; font-size: 12px; font-weight: 700; color: #fff; background: rgba(0,0,0,.55); padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+.mp-tile.on-turn { box-shadow: 0 0 0 2px #f5c542, 0 0 12px rgba(245,197,66,.5); }
+.mp-tile.spec { opacity: .88; }
+.mp-show-cards { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: 2px dashed transparent; border-radius: 10px; padding: 4px 8px; cursor: pointer; color: inherit; font: inherit; }
+.mp-show-cards:hover, .mp-show-cards:focus-visible { border-color: var(--muted, #888); outline: none; }
+.mp-show-cards .mp-show-hint { font-size: 12px; color: var(--muted, #aaa); }
+.mp-show-cards.shown .mp-hero-faces { animation: mpShowFlip 420ms ease-out both; }
+.mp-show-cards.shown .mp-show-hint { color: #f5c542; font-weight: 700; }
+.mp-show-count { font-size: 12px; color: var(--muted, #aaa); }
+@keyframes mpShowFlip {
+  0% { transform: perspective(400px) rotateY(90deg); opacity: .3; }
+  100% { transform: perspective(400px) rotateY(0deg); opacity: 1; }
+}
+.mp-dock.spectating .mp-actions, .mp-dock.spectating .mp-raise-ctl { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .mp-show-cards.shown .mp-hero-faces { animation: none; }
+}
+/* ==== /A ==== */
+
+/* ---- v6: no right column; Cams/Chat toggle at the foot of the left column; settings and profile dialogs;
+   profile chip and gear at the top right; back arrow at the far left of the header ---- */
+.mp-panel { display: none !important; }
+.mp-back {
+  width: 40px; height: 40px; flex: 0 0 auto; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--text); font-size: 24px; line-height: 1; cursor: pointer;
+  display: inline-grid; place-items: center; padding: 0 0 3px;
+}
+.mp-back:focus-visible, .mp-chip:focus-visible, .mp-seg-btn:focus-visible, .mp-sheet button:focus-visible { outline: 2px solid var(--raise); outline-offset: 2px; }
+.mp-chip {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 40px; max-width: 190px; padding: 2px 12px 2px 3px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--text); cursor: pointer; font: inherit;
+}
+.mp-chip-av { display: inline-flex; flex: 0 0 auto; }
+.mp-chip-av .mp-av { width: 34px; height: 34px; }
+.mp-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: var(--fw-strong); min-width: 0; }
+.mp-seg {
+  flex: 0 0 auto; display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--surface-2); margin-top: auto;
+}
+.mp-seg-btn {
+  flex: 1 1 0; min-width: 0; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 0; border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer;
+}
+.mp-seg-btn.on { background: var(--surface); color: var(--text); font-weight: var(--fw-strong); box-shadow: 0 1px 3px rgb(0 0 0 / 0.3); }
+.mp-seg-btn .mp-badge { min-width: 18px; height: 18px; font-size: 11px; padding: 0 5px; }
+/* the chat replaces the camera grid inside the same box */
+.mp-cam-card:not(.view-chat) .mp-chat { display: none !important; }
+.mp-cam-card.view-chat #mp-cams, .mp-cam-card.view-chat #mp-cams-more { display: none !important; }
+.mp-cam-card .mp-chat {
+  position: static !important; width: auto !important; border: 0 !important; border-radius: 0 !important; background: none !important;
+  flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+}
+.mp-cam-card .mp-chat-head { display: none !important; }
+.mp-cam-card.view-chat .mp-chat-body { display: flex !important; flex: 1 1 auto; min-height: 0; padding: 0; justify-content: flex-end; }
+.mp-cam-card.view-chat .mp-chat-log { max-height: none; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.mp-chat:has(.mp-chat-body:not(.hidden)) { width: auto; }
+
+/* dialogs: settings (players + admin) and profile */
+.mp-sheet { z-index: 60; place-items: center; }
+.mp-sheet.hidden { display: none !important; }
+.mp-sheet .mp-modal-box { width: min(480px, 100%); }
+.mp-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mp-sheet-head .mp-h { margin: 0; }
+.mp-sheet-sec { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.mp-sheet-sec .mp-players { max-height: 30dvh; overflow-y: auto; }
+.mp-sheet .mp-drawer, .mp-sheet .mp-fold { display: block; }
+.mp-admin-sec .mp-admin button:disabled, .mp-admin-sec select:disabled, .mp-admin-sec input:disabled { opacity: 0.5; cursor: not-allowed; }
+.mp-admin-sec summary { display: none; }
+.mp-admin-sec .mp-admin-details { display: block; border: 0; padding: 0; background: none; }
+
+/* wide: two columns (cams | table) */
+@media (min-width: 1100px) and (min-height: 600px) {
+  .mp-body { grid-template-columns: clamp(268px, 21vw, 320px) minmax(0, 1fr); }
+  .mp-tools > .mp-chip { display: inline-flex !important; }
+  .mp-tools > #mp-btn-settings { display: inline-grid !important; }
+  .mp-cam-card { box-shadow: none; }
+}
+/* phones and short screens: the cams overlay keeps the title and back arrow visible */
+@media (max-width: 600px), (max-height: 500px) {
+  .mp-title { display: inline; font-size: 16px; }
+  .mp-chip-name { display: none; }
+  .mp-chip { min-width: 40px; max-width: 40px; justify-content: center; padding: 2px; }
+  .mp-side .mp-cam-card { width: auto; }
+}
+
+/* phone portrait (390x844 and 360x640): one column, nothing wider than the screen. The title is
+ * dropped (the back arrow, connection pill and icon column carry the screen), the toolbar is compact. */
+@media (max-width: 600px) and (min-height: 501px) {
+  .mp-app, .mp-body, .mp-main, .mp-tablev { min-width: 0; max-width: 100%; }
+  .mp-body { grid-template-columns: minmax(0, 1fr); }
+  .mp-title { display: none; }
+  .mp-tbar { min-width: 0; flex: 1 1 auto; overflow: hidden; }
+  .mp-tools { flex: 0 0 auto; gap: 4px; }
+  .mp-tools > .mp-ibtn, .mp-tools > .mp-chip { width: 38px; height: 38px; min-width: 38px; }
+  .mp-conn { min-width: 0; overflow: hidden; }
+}
+
+/* Bots and symbols (mp.js botAvHtml / actSymHtml): the avatar and the last action are hover/tap targets. */
+.gloss-av { display: inline-flex; border-radius: 50%; cursor: help; }
+.gloss-av:focus-visible, .mp-last[data-gloss]:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.mp-last.sym-tag { display: inline-flex; align-items: center; justify-content: center; min-height: 16px; cursor: help; color: var(--sc, #c9ccd2); }
+.mp-last.sym-tag .sym { display: block; width: 14px; height: 14px; }
+.mp-last.la-check { --sc: #9cc3e8; }
+.mp-last.la-call, .mp-last.la-limp { --sc: #6fd39a; }
+.mp-last.la-raise { --sc: #ff7a59; }
+.mp-last.la-bet { --sc: #e8c25a; }
+.mp-last.la-fold, .mp-last.la-out { --sc: #8a919c; }
+.mp-last.la-allin { --sc: #ff4fa3; }
+.mp-last.la-other { --sc: #c9ccd2; }
+
+/* bigger chat bubbles and toast (they were too small to read) */
+.mp-bub { max-width: 260px; padding: 8px 12px; border-radius: 14px; font-size: 15px; line-height: 1.35; -webkit-line-clamp: 3; }
+.mp-bub.cam { max-width: 240px; font-size: 14px; }
+.mp-bub .mp-emoji { width: 22px; height: 22px; vertical-align: -5px; }
+.mp-bub .mp-emoji.big { width: 30px; height: 30px; }
+.mp-chat-toast { padding: 8px 16px; font-size: 15px; max-width: min(92vw, 460px); }
+@media (max-width: 520px) {
+  .mp-bub { max-width: 200px; font-size: 14px; }
+  .mp-bub.cam { max-width: 180px; font-size: 13px; }
+}
+
+/* comic speech bubbles: white, dark text, rounded, with a tail pointing at the speaker */
+.mp-bub {
+  max-width: 300px; min-width: 56px; padding: 10px 16px; border-radius: 20px; text-align: center;
+  background: #fff; color: #15171c; font-size: 17px; font-weight: 600; line-height: 1.3; -webkit-line-clamp: 4;
+  border: 2px solid #15171c; box-shadow: 0 6px 16px rgba(0, 0, 0, .45); overflow: visible;
+  display: block; overflow-wrap: anywhere;
+}
+.mp-bub::after {
+  content: ''; position: absolute; left: 50%; bottom: -11px; width: 18px; height: 18px; margin-left: -9px;
+  background: #fff; border-right: 2px solid #15171c; border-bottom: 2px solid #15171c;
+  border-bottom-right-radius: 4px; transform: rotate(45deg) skew(8deg, 8deg);
+}
+.mp-bub-t { display: block; overflow: visible; }   /* no clip box: it drew a faint frame around the big emoji */
+.mp-bub.below::after { bottom: auto; top: -11px; transform: rotate(225deg) skew(8deg, 8deg); }
+.mp-bub.cam::after { left: -11px; bottom: auto; top: 50%; margin: -9px 0 0 0; transform: rotate(135deg) skew(8deg, 8deg); }
+.mp-bub.cam.tail-r::after { left: auto; right: -11px; transform: rotate(-45deg) skew(8deg, 8deg); }
+.mp-bub .mp-emoji { width: 56px; height: 56px; vertical-align: -16px; }
+.mp-bub .mp-emoji.big { width: 104px; height: 104px; vertical-align: middle; }
+.mp-bub .mp-emoji.big + .mp-emoji.big { margin-left: 4px; }
+.mp-bub.cam { max-width: 260px; font-size: 16px; }
+@media (max-width: 520px) {
+  .mp-bub { max-width: 220px; font-size: 15px; padding: 8px 12px; }
+  .mp-bub.cam { max-width: 200px; font-size: 14px; }
+}
+
+/* The dialog's progressive-blinds / spectator selects sit in the admin grid (mp-grid2 styling). */
+.mp-admin .mp-grid2 { margin-bottom: 8px; }
+
+/* Check is free: Fold stays enabled but reads as secondary. */
+#mp-fold.free-check { opacity: 0.45; transition: opacity 0.15s ease, transform 0.15s ease; }
+#mp-fold.free-check:hover:not(:disabled) { opacity: 0.7; transform: translateY(-1px); }
+
+/* System lines in the chat (hand results): centred, muted, with a small star. */
+.mp-chat-log li.sys { list-style: none; text-align: center; color: var(--muted, #9aa3ad); font-size: 12px; font-style: italic; background: none; padding: 2px 4px; }
+.mp-chat-log li.sys .sys-ic { color: var(--gold); margin-right: 2px; }
+
+/* Back arrow confirmation (Leave / Stay). */
+.mp-leave { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgb(0 0 0 / 0.55); padding: 16px; }
+.mp-leave-card { background: var(--surface, #1d2430); color: var(--text, #eee); border-radius: var(--r-md, 12px); padding: 18px 20px; width: min(340px, 92vw); box-shadow: 0 12px 40px rgb(0 0 0 / 0.5); }
+.mp-leave-t { margin: 0 0 6px; font-weight: 700; font-size: 17px; }
+.mp-leave-s { margin: 0 0 14px; font-size: 14px; opacity: 0.8; }
+.mp-leave-acts { display: flex; gap: 8px; justify-content: flex-end; }
+.mp-leave-go { background: var(--raise, #c0392b); color: #fff; }
+
+/* ---- round: camera and mic UI removed; table takes the full width; chat is a right-edge drawer;
+   phones get BB presets on the raise row and a long-press exact-amount popover ---- */
+.mp-body, .mp-body.hidden, .mp-body:not(.hidden) { grid-template-columns: minmax(0, 1fr) !important; gap: 0 !important; }
+.mp-chat-btn { position: relative; }
+.mp-chat-btn .mp-badge { position: absolute; top: 2px; right: 0; }
+.mp-chat-drawer {
+  position: fixed; top: 0; right: 0; bottom: var(--dock-clear, 0px); z-index: 60; width: min(340px, 88vw);
+  display: none; flex-direction: column; gap: 8px; padding: 12px;
+  background: var(--surface-1, #1b1f24); color: var(--text, #eee);
+  border-left: 1px solid rgb(255 255 255 / 0.12); box-shadow: -12px 0 32px rgb(0 0 0 / 0.45);
+}
+.mp-chat-drawer.open { display: flex; }
+/* The open drawer covers the top-right corner: the floating Look button yields so the drawer's X is clickable. */
+body:has(.mp-chat-drawer.open) .look-btn.look-float { visibility: hidden; }
+.mp-chat-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; }
+.mp-chat-top .mp-btn { min-width: 44px; min-height: 44px; }
+.mp-chat-drawer .mp-chat-body { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; padding: 0; }
+.mp-chat-drawer .mp-chat-body.hidden { display: none; }
+.mp-chat-drawer .mp-chat-log { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; font-size: 14px; }
+.mp-chat-drawer .mp-chat-form input { min-height: 44px; min-width: 0; flex: 1 1 auto; }
+.mp-chat-drawer .mp-chat-form .mp-btn { min-height: 44px; }
+.mp-rpop.hidden { display: none; }
+
+@media (pointer: coarse), (max-width: 600px) {
+  .mp-dock { position: relative; }
+  .mp-raise-ctl > input { display: none !important; }
+  .mp-raise-ctl { display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+  .mp-raise-ctl .mp-quick { display: contents; }
+  .mp-raise-ctl .mp-quick .mp-btn {
+    min-height: 44px; padding: 2px; width: auto; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-size: 12px; line-height: 1.1;
+  }
+  .mp-raise-ctl .mp-quick .qv { font-size: 12px; opacity: 0.85; font-weight: 400; }
+  .mp-rpop {
+    position: absolute; right: 8px; bottom: calc(100% + 8px); z-index: 40;
+    width: min(260px, calc(100vw - 32px)); padding: 10px; border-radius: 12px;
+    background: var(--surface-2, #232830); box-shadow: 0 12px 32px rgb(0 0 0 / 0.5);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .mp-rpop-row { display: flex; align-items: center; gap: 8px; }
+  .mp-rpop-row .mp-btn { min-width: 44px; min-height: 44px; }
+  .mp-rpop-field { flex: 1 1 auto; display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .mp-rpop-field input { flex: 1 1 auto; min-width: 0; min-height: 44px; font-size: 18px; text-align: center; }
+  .mp-rpop-acts { display: flex; gap: 8px; justify-content: flex-end; }
+  .mp-rpop-acts .mp-btn { min-height: 44px; }
+  .mp-rpop-err { color: #ff8a80; font-size: 13px; margin: 0; }
+}
+
+/* round 5: breathing room between the felt and the action dock (desktop and tablet; landscape phones
+   keep the dock floating over the felt) */
+@media (min-height: 501px) {
+  .mp-tablev { gap: 14px; }
+}
+
+/* ===== round 6: fit the lobby and the raise presets at every size (test/e2e-layout.js) =====
+ * The volume slider is one full-width row of the host card (it was a loose block that pushed the card
+ * past the bottom edge). Landscape phones keep the floating icon column clear of the host card. */
+.mp-host .sound-field { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
+.mp-host .sound-field > span:first-child { white-space: nowrap; }
+.mp-host .sound-field .sound-row { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.mp-host .sound-field input[type="range"] { flex: 1 1 auto; min-width: 0; }
+@media (max-height: 500px) {
+  .mp-lobby { padding-right: 112px; grid-template-columns: minmax(0, 160px) minmax(0, 1fr); }
+}
+@media (max-width: 600px), (pointer: coarse) {
+  .mp-raise-ctl .mp-quick .qv, .mp-app .mp-quick small.qv { font-size: 12px; }
+}
+.mp-app .mp-quick small.qv { font-size: 12px; }
+/* landscape phones: the raise popover opens only from R (the coarse-pointer rule above forces it open) */
+@media (max-height: 500px) {
+  .mp-dock:not(.raise-open) .mp-raise-ctl { display: none !important; }
+}
+/* lobby: the host card gets the full remaining height on short screens */
+@media (max-height: 500px) {
+  .mp-host { padding: 6px 8px; }
+  .mp-host .sound-field { margin-top: 2px; }
+  .mp-host .mp-hpages { margin-bottom: 2px; }
+}
+
+/* touch: no double-tap zoom on controls, no bounce or pull-to-refresh over the table, 16px inputs
+   so iOS does not zoom on focus, and the table clears the notch and home-bar insets */
+button, [role="button"], .mp-ibtn, .mp-act, .mp-chip { touch-action: manipulation; }
+#mp-root, #mp-table-view, .mp-table-wrap { overscroll-behavior: none; }
+@media (pointer: coarse) {
+  #mp-root input, #mp-root select, #mp-root textarea { font-size: 16px; }
+}
+#mp-root { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+
+/* coarse pointers and phone widths: 44x44 touch target for the icon buttons and the tools row without
+   changing their layout size; the ::after box is the enlarged hit area, centred on the button */
+@media (pointer: coarse), (max-width: 700px) {
+  .mp-ibtn, #mp-btn-chat, #mp-btn-settings, .mp-tools > .mp-chip, .mp-tools > button { position: relative; }  .mp-ibtn::after, #mp-btn-chat::after, #mp-btn-settings::after, .mp-tools > .mp-chip::after, .mp-tools > button::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px;
+    transform: translate(-50%, -50%); border-radius: inherit; background: transparent;
+  }
+}

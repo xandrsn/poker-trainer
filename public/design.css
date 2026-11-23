@@ -1,0 +1,221 @@
+/* Poker Trainer: design-token layer. Loaded LAST (after every other stylesheet).
+ * Principles
+ *  - Tokens first: radii 8/12/16, elevation shadows, hairline borders, focus ring, transitions.
+ *  - Spacing is NOT changed: --s1..--s7 already form a 4/8/12/16/24/32/48 scale and seat, table and action-row
+ *    geometry depends on them. Layout-critical sizes (seats, table, F/C/R row, tap targets) are left alone.
+ *  - Page colours that theme.js writes inline on :root (--bg, --surface, --line, --text, --gold ...) are never
+ *    redefined here, so the user theme and the light-page logic keep working. Derived tokens use color-mix()
+ *    or rgb(var(--*-rgb) / a) so they follow whatever the page colours are.
+ *  - Surface levels: bg < surface < raised (surface-2 / elevated) with shadows, not extra borders.
+ */
+
+:root {
+  /* radii */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+
+  /* hairlines: a single soft edge instead of heavy borders (rgb(255 255 255 / .08) on dark, dark on light) */
+  --hair: rgb(var(--text-rgb) / 0.09);
+  --hair-strong: rgb(var(--text-rgb) / 0.16);
+
+  /* surface levels above --surface */
+  --surface-raised: color-mix(in srgb, var(--surface-2) 82%, var(--text) 4%);
+  --fill-soft: rgb(var(--text-rgb) / 0.05);
+  --fill-hover: rgb(var(--text-rgb) / 0.09);
+
+  /* elevation */
+  --elev-1: 0 1px 2px rgb(var(--shadow-rgb) / 0.35);
+  --elev-2: 0 6px 16px -4px rgb(var(--shadow-rgb) / 0.45), 0 1px 0 rgb(var(--white-rgb) / 0.04) inset;
+  --elev-3: 0 24px 60px -12px rgb(var(--shadow-rgb) / 0.7), 0 0 0 1px var(--hair);
+  --elev-raised: 0 1px 2px rgb(var(--shadow-rgb) / 0.3), inset 0 1px 0 rgb(var(--white-rgb) / 0.03);
+  --elev-overlay: var(--elev-3);
+
+  /* focus ring and motion */
+  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--gold);
+  --t-fast: 150ms;
+  --t-base: 180ms;
+
+  /* type: Fraunces for titles, IBM Plex Sans for UI, Plex Mono for numbers in tables */
+  --fs-caption: 12px;
+  --fs-sm: 14px;
+  --fw-strong: 600;
+  --track-label: 0.08em;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+body {
+  font-family: var(--font);
+}
+
+/* headings: display serif, tighter tracking, one clear step between levels */
+h1, h2, .topbar .brand, #menu-heading {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+h3, .panel h2, .sheet-head h2, .drawer-head h2, .help-head h2 {
+  letter-spacing: -0.005em;
+}
+
+/* small uppercase labels share one style */
+.fb-card h3, .side-col h3, .panel h3, .kpi-label, .tcol-title {
+  letter-spacing: var(--track-label);
+}
+.kpi-label { font-size: var(--fs-caption); font-weight: var(--fw-strong); }
+
+/* numbers: sans with tabular figures instead of the display serif */
+.kpi-value, .stats td.v, .chip, .tcol-custom {
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.01em;
+}
+.kpi-value { font-weight: 600; }
+
+/* ---------- focus and scrollbars ---------- */
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--text-rgb) / 0.18) transparent;
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--text-rgb) / 0.16);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--text-rgb) / 0.28); background-clip: padding-box; }
+
+/* ---------- buttons ---------- */
+.ghost, .icon-btn, .mp-ibtn {
+  border-color: var(--hair);
+  background: transparent;
+  transition: background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.ghost:hover, .icon-btn:hover, .mp-ibtn:hover {
+  background: var(--fill-hover);
+  border-color: var(--hair-strong);
+}
+.ghost:active, .icon-btn:active { background: var(--fill-soft); }
+.icon-btn, .mp-ibtn { background: var(--fill-soft); }
+.ghost.danger {
+  background: rgb(var(--fold-rgb) / 0.08);
+  border-color: rgb(var(--fold-rgb) / 0.4);
+}
+.ghost.danger:hover { background: rgb(var(--fold-rgb) / 0.18); }
+
+/* the round MP tool buttons match the square icon buttons */
+.mp-ibtn { border-radius: var(--r-md); }
+
+/* primary: gold fill, dark ink. Secondary: .ghost. Danger: .ghost.danger. */
+.big {
+  border-radius: var(--r-md);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: var(--elev-1), inset 0 1px 0 rgb(var(--white-rgb) / 0.14);
+  transition: transform var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease),
+    filter var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease);
+}
+.big:not(:disabled):hover { filter: brightness(1.06); box-shadow: var(--elev-2), inset 0 1px 0 rgb(var(--white-rgb) / 0.18); }
+.big:not(:disabled):active { box-shadow: inset 0 2px 4px rgb(var(--shadow-rgb) / 0.3); }
+.big:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+
+/* F / C / R: fold muted red, call blue, raise green (--raise, kept: gold fails contrast on light pages).
+ * Labels use the dark ink on the lighter fills so they read clearly. */
+.btn-fold { background: rgb(var(--fold-rgb) / 0.92); color: var(--text); }
+.btn-call { background: var(--call); color: var(--fill-text); }
+.btn-raise { background: var(--raise); color: var(--fill-text); }
+.btn-fold .key, .btn-call .key, .btn-raise .key { color: inherit; }
+.btn-next { border-radius: var(--r-md); }
+
+/* segmented controls and chips */
+.seg {
+  border-radius: var(--r-md);
+  background: var(--fill-soft);
+}
+.seg-btn { border-radius: var(--r-sm); transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease); }
+.chip {
+  border-color: var(--hair);
+  background: var(--fill-soft);
+  letter-spacing: 0;
+}
+.chip-best { border-color: rgb(var(--gold-rgb) / 0.5); background: rgb(var(--gold-rgb) / 0.08); }
+
+/* ---------- surfaces ---------- */
+.panel, .fb-card {
+  border: 1px solid var(--hair);
+  border-radius: var(--r-lg);
+  box-shadow: var(--elev-raised);
+}
+.kpi {
+  background: var(--surface-raised);
+  border-radius: var(--r-md);
+}
+.stats td { border-bottom-color: var(--hair); }
+
+/* ---------- overlays: sheets, drawers, dialogs ---------- */
+.sheet-backdrop, .drawer-backdrop, .help-overlay {
+  background: rgb(var(--shadow-rgb) / 0.55);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.sheet, .help-dialog {
+  border: 1px solid var(--hair);
+  border-radius: var(--r-lg);
+  box-shadow: var(--elev-3);
+}
+.drawer {
+  background: var(--surface-raised);
+  border-left: 1px solid var(--hair);
+  box-shadow: var(--elev-3);
+}
+.help-dialog { background: var(--surface-raised); }
+.drawer-head, .sheet-head, .help-head { margin-bottom: var(--s4); }
+.fx-box {
+  border: 1px solid var(--hair);
+  border-radius: var(--r-lg);
+  box-shadow: var(--elev-3);
+}
+
+/* ---------- inputs ---------- */
+input[type="number"], input[type="text"], select {
+  border-radius: var(--r-sm);
+  border-color: var(--hair-strong);
+  transition: border-color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease);
+}
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):focus-visible,
+select:focus-visible {
+  border-color: var(--gold);
+}
+
+/* ---------- hover and tiles ---------- */
+.mode-card {
+  border-radius: var(--r-lg);
+  border-color: var(--hair);
+  box-shadow: var(--elev-1);
+  transition: border-color var(--t-base) var(--ease), background-color var(--t-base) var(--ease),
+    box-shadow var(--t-base) var(--ease);
+}
+.mode-card:hover { box-shadow: var(--elev-2); }
+.mode-card:focus-visible { outline-offset: 3px; }
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 1ms !important;
+  }
+}
+
+/* settings tabs: same active treatment as the other segmented controls (gold, dark ink) */
+.set-tab[aria-selected="true"] { background: var(--gold); color: var(--fill-text); }
+.menu-credit { text-align: center; font-size: 12px; opacity: 0.7; margin-top: 12px; }
+.menu-credit a { color: inherit; }

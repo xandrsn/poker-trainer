@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>Poker Trainer</title>
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=optional" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=optional"></noscript>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="seats.css">
+  <link rel="stylesheet" href="anim.css">
+  <link rel="stylesheet" href="mp.css">  <link rel="stylesheet" href="game-mode.css">
+  <link rel="stylesheet" href="table-skin.css">
+  <link rel="stylesheet" href="mp-skin.css">
+  <link rel="stylesheet" href="turn.css">
+  <link rel="stylesheet" href="menu-settings.css">
+  <link rel="stylesheet" href="ui-controls.css">
+  <link rel="stylesheet" href="polish.css">
+  <link rel="stylesheet" href="mp-rooms.css">
+  <link rel="stylesheet" href="menu-hub.css">
+  <link rel="stylesheet" href="mp-lobby-skin.css">
+  <link rel="stylesheet" href="review-ui.css">
+  <link rel="stylesheet" href="design.css">
+</head>
+<body data-view="menu">
+<noscript><p class="noscript-msg" style="padding:16px;text-align:center">Poker Trainer needs JavaScript to run. Please enable JavaScript and reload the page. / Poker Trainer necesita JavaScript. Actívalo y recarga la página.</p></noscript>
+<div class="app">
+
+  <header class="topbar">
+    <button type="button" class="brand brand-home" id="btn-home" data-i18n-aria="aria.home" aria-label="Poker Trainer: main menu"><span class="suit-logo" aria-hidden="true">&spades;</span><span data-i18n="app.title">Poker Trainer</span></button>
+
+    
+
+    <div class="top-right">
+      <button type="button" class="icon-btn settings-btn" id="btn-settings" data-i18n-aria="aria.settings" aria-label="Settings" aria-haspopup="dialog" aria-expanded="false" aria-controls="settings-panel"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></svg></button>
+    </div>
+  </header>
+
+  <!-- In a mode the topbar is hidden: this small arrow returns to the menu (top-right). -->
+  <button type="button" class="game-back icon-btn" id="btn-back" data-i18n-aria="btn.back" aria-label="Back">
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 6l-6 6 6 6"/></svg>
+  </button>
+
+  <!-- Back arrow during a live hand or game: a small confirmation (Esc = stay). Not a native dialog. -->
+  <div class="hidden" id="leave-pop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60">
+    <div role="alertdialog" aria-modal="true" aria-labelledby="leave-title" aria-describedby="leave-msg" tabindex="-1" style="margin:22vh auto 0;max-width:320px;width:calc(100% - 32px);padding:18px 20px;border-radius:12px;background:#1b1f24;color:#f4f4f4;box-shadow:0 10px 30px rgba(0,0,0,.4)">
+      <p id="leave-title" style="margin:0 0 6px;font-weight:600" data-i18n="leave.title">Leave the game?</p>
+      <p id="leave-msg" style="margin:0 0 14px;opacity:.85" data-i18n="leave.msg">Progress of the current hand is lost.</p>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="ghost" id="leave-stay" data-i18n="leave.stay">Stay</button><button type="button" class="big" id="leave-go" data-i18n="leave.go">Leave</button></div>
+    </div>
+  </div>
+
+  <!-- Settings side panel (main menu only, opened by the header gear): language, volume, table look. -->
+  <div class="set-backdrop hidden" id="settings-backdrop"></div>
+  <aside class="set-panel hidden" id="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-panel-title" tabindex="-1">
+    <div class="set-head">
+      <h2 id="settings-panel-title" data-i18n="settings.title">Settings</h2>
+      <button type="button" class="ghost small" id="btn-settings-close" data-i18n="btn.close">Close</button>
+    </div>
+    <div class="set-tabs" role="tablist" data-i18n-aria="aria.settingsSections" aria-label="Settings sections">
+      <button type="button" role="tab" class="set-tab" id="set-tab-lang" data-tab="lang" aria-controls="set-pane-lang" aria-selected="true" data-i18n="menu.language">Language</button>
+      <button type="button" role="tab" class="set-tab" id="set-tab-vol" data-tab="vol" aria-controls="set-pane-vol" aria-selected="false" tabindex="-1" data-i18n="sound.volume">Volume</button>
+      <button type="button" role="tab" class="set-tab" id="set-tab-table" data-tab="table" aria-controls="set-pane-table" aria-selected="false" tabindex="-1" data-i18n="settings.table">Table</button>
+      <button type="button" role="tab" class="set-tab" id="set-tab-user" data-tab="user" aria-controls="set-pane-user" aria-selected="false" tabindex="-1" data-i18n="settings.user">User</button>
+    </div>
+    <div class="set-body">
+    <section class="set-sec" id="set-pane-lang" role="tabpanel" aria-labelledby="set-tab-lang">
+      <h3 id="set-lang-h" class="set-h" data-i18n="menu.language">Language</h3>
+      <div class="seg" role="group" data-i18n-aria="lang.label" aria-label="Language">
+        <button type="button" class="seg-btn lang-btn" data-lang="en" aria-pressed="false">EN</button>
+        <button type="button" class="seg-btn lang-btn" data-lang="es" aria-pressed="false">ES</button>
+      </div>
+    </section>
+    <section class="set-sec hidden" id="set-pane-vol" role="tabpanel" aria-labelledby="set-tab-vol">
+      <h3 id="set-vol-h" class="set-h" data-i18n="sound.volume">Volume</h3>
+      <div class="sound-row"><input type="range" min="0" max="100" step="1" value="60" id="set-volume" data-sound-volume data-i18n-aria="aria.volume" aria-label="Volume"><output class="sound-out" data-sound-volume-out>60</output></div>
+    </section>
+    <section class="set-sec hidden" id="set-pane-table" role="tabpanel" aria-labelledby="set-tab-table">
+      <div id="menu-theme-settings" class="theme-settings"></div>
+    </section>
+    <section class="set-sec hidden" id="set-pane-user" role="tabpanel" aria-labelledby="set-tab-user">
+      <h3 class="set-h" data-i18n="settings.user">User</h3>
+      <div class="user-row">
+        <span class="user-av" id="user-av" aria-hidden="true"></span>
+        <div class="user-fields">
+          <label class="field"><span data-i18n="user.name">Name</span><input type="text" id="user-name" maxlength="16" autocomplete="nickname" data-i18n-aria="user.name" aria-label="Name"></label>
+          <div class="user-btns">
+            <label class="ghost small user-pick"><span data-i18n="user.photo">Photo</span><input type="file" id="user-file" accept="image/*" class="sr-only"></label>
+            <button type="button" class="ghost small" id="user-clear" data-i18n="user.remove">Remove photo</button>
+          </div>
+          <p class="hint" id="user-err" role="alert"></p>
+          <p class="hint" data-i18n="user.hint">Stored on this device. Your name shows as You at the table.</p>
+        </div>
+      </div>
+    </section>
+    </div>
+  </aside>
+
+  <!-- Main menu: the first screen. Mode cards reveal their settings. -->
+  <section id="view-menu" class="menu-view" aria-labelledby="menu-heading">
+    <h1 id="menu-heading" class="menu-heading" data-i18n="menu.chooseMode">Choose a mode</h1>
+    <!-- Two main tiles (Play, Practice). Each reveals its own options beside it; see menu-hub.js. -->
+    <div class="menu-hub" id="menu-format" role="group" data-open="">
+      <div class="hub-group" data-group="play">
+        <button type="button" class="hub-main" id="hub-play" aria-expanded="false" aria-controls="hub-opts-play">
+          <span class="hm-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></span>
+          <span class="hm-name" data-i18n="menu.hubPlay">Play</span>
+          <span class="hm-desc" data-i18n="menu.hubPlayDesc">Against bots or with friends.</span>
+        </button>
+        <div class="hub-opts" id="hub-opts-play" role="group" aria-labelledby="hub-play">
+          <button type="button" class="mode-card" data-fmt="table">
+            <span class="mc-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12zm0 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg></span>
+            <span class="mc-name" data-i18n="menu.hubVsBots">Vs bots</span>
+            <span class="mc-desc" data-i18n="menu.descTable">One table with bots. Play until you run out of chips or win them all.</span>
+          </button>
+          <button type="button" class="mode-card" id="menu-card-mp" data-mp-open>
+            <span class="mc-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm6 1a2.5 2.5 0 1 0 0-5M2 20c0-3.3 3-5 7-5s7 1.7 7 5zm14 0c0-1.9-.8-3.4-2-4.4.5-.1 1-.1 2-.1 2.6 0 4 1.2 4 3.5z"/></svg></span>
+            <span class="mc-name" data-i18n="menu.cardMP">Multiplayer</span>
+            <span class="mc-desc" data-i18n="menu.descMP">Play with friends at one shared table, with bots and chat.</span>
+          </button>
+        </div>
+      </div>
+      <div class="hub-group" data-group="practice">
+        <button type="button" class="hub-main" id="hub-practice" aria-expanded="false" aria-controls="hub-opts-practice">
+          <span class="hm-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30"><path fill="currentColor" d="M4 19h16v2H4zM6 17V9h3v8zm5 0V5h3v12zm5 0v-6h3v6z"/></svg></span>
+          <span class="hm-name" data-i18n="menu.hubPractice">Practice</span>
+          <span class="hm-desc" data-i18n="menu.hubPracticeDesc">Exams, practice hands and single spots.</span>
+        </button>
+        <div class="hub-opts" id="hub-opts-practice" role="group" aria-labelledby="hub-practice">
+          <button type="button" class="mode-card" data-fmt="exam">
+            <span class="mc-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M6 2h12v4l-4 4 4 4v8H6v-8l4-4-4-4zm3 4.6L12 10l3-3.4V4H9z"/></svg></span>
+            <span class="mc-name" data-i18n="menu.cardExam">Exam</span>
+            <span class="mc-desc" data-i18n="menu.descExam">Full hands for as long as you want. No ranges or feedback while you play; the summary and analysis come at the end.</span>
+          </button>
+          <button type="button" class="mode-card" data-fmt="practice">
+            <span class="mc-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M4 19h16v2H4zM6 17V9h3v8zm5 0V5h3v12zm5 0v-6h3v6z"/></svg></span>
+            <span class="mc-name" data-i18n="menu.cardPractice">Practice</span>
+            <span class="mc-desc" data-i18n="menu.descPractice">Whole hands from deal to showdown, with ranges and feedback after every move.</span>
+          </button>
+          <button type="button" class="mode-card" data-fmt="quick">
+            <span class="mc-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M12 3l9 9-9 9-9-9zm0 4.5L7.5 12 12 16.5 16.5 12z"/></svg></span>
+            <span class="mc-name" data-i18n="menu.cardQuick">Single spots</span>
+            <span class="mc-desc" data-i18n="menu.descQuick">One decision at a time, from random spots.</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- Row 2: statistics and rules, smaller secondary buttons (not modes). -->
+    <div class="menu-tools" role="group" data-i18n-aria="aria.menuTools" aria-label="Statistics and rules">
+      <button type="button" class="tool-btn" id="menu-card-progress">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 19h16v2H4zM5 17V9h3v8zm5 0V5h3v12zm5 0v-6h3v6z"/></svg>
+        <span data-i18n="menu.statsBtn">Statistics</span>
+      </button>
+      <button type="button" class="tool-btn" id="menu-card-rules">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M5 3h11l3 3v15H5zm2 2v14h10V7h-3V5z"/></svg>
+        <span data-i18n="menu.cardRules">Rules</span>
+      </button>
+    </div>
+    <p class="menu-credit"><a href="https://charlieandersen.vercel.app" target="_blank" rel="noopener">Made by Charlie Andersen ↗</a> · <a href="https://github.com/xandrsn/poker-trainer" target="_blank" rel="noopener">Source</a></p>
+
+    <section id="menu-settings" class="menu-settings hidden" data-i18n-aria="aria.settings" aria-label="Settings">
+      <div class="menu-setup-row">
+        <button type="button" class="ghost small" id="menu-back" data-i18n="btn.back">Back</button>
+        <h2 class="menu-setup" data-i18n="menu.setup">Settings for this mode</h2>
+      </div>
+      <div class="menu-grid">
+        <div class="menu-group">
+          <span class="menu-label" data-i18n="menu.players">Players</span>
+          <div class="field-row">
+            <label class="field"><span data-i18n="menu.min">Min</span><select id="menu-pmin"></select></label>
+            <label class="field"><span data-i18n="menu.max">Max</span><select id="menu-pmax"></select></label>
+          </div>
+        </div>
+        <div class="menu-group">
+          <span class="menu-label" data-i18n="settings.personalities">CPU personalities</span>
+          <div class="pers-list" id="menu-pers"></div>
+          <label class="check"><input type="checkbox" id="menu-money"><span data-i18n="menu.money">Money (stacks)</span></label>
+        </div>
+<div class="menu-group table-only"><span class="menu-label" data-i18n="menu.tableBots">Bots</span><div class="field-row"><label class="field"><span data-i18n="menu.tableBotsLabel">Bots</span><select id="menu-bots"></select></label><label class="field"><span data-i18n="menu.tableStack">Starting stack (BB)</span><input type="number" id="menu-stack" min="5" max="1000" step="0.5" value="100"></label></div><label class="check"><input type="checkbox" id="menu-prog"><span data-i18n="menu.tableProg">Progressive blinds (every 10 hands, doubling)</span></label></div>
+      </div>
+      <details class="menu-more menu-advanced">
+        <summary data-i18n="menu.advanced">Position, street and stack</summary>
+        <div class="set-grid">
+          <label class="field"><span data-i18n="settings.position">Position</span><select id="set-position"></select></label>
+          <label class="field"><span data-i18n="settings.street">Street</span><select id="set-street"></select></label>
+          <label class="field" id="set-stack-field"><span data-i18n="settings.stack">Stack (BB)</span><input type="number" id="set-stack" min="5" max="1000" step="0.5" value="100" data-i18n-aria="aria.startStack" aria-label="Starting stack in big blinds"></label>
+          <label class="field"><span data-i18n="settings.stacks">Stacks</span><select id="set-stacks"></select></label>
+          <label class="field set-span hidden" id="set-custom-field"><span data-i18n="settings.customStacks">Custom stacks (BB, comma separated, you first)</span><input type="text" id="set-custom-stacks" data-i18n-aria="aria.customStacks" aria-label="Custom stacks in big blinds"></label>
+          <p class="hint set-span" data-i18n="settings.nextSession">Personalities and money apply from the next session.</p>
+        </div>
+      </details>
+      <button type="button" class="big btn-call sheet-start" id="menu-start"><span data-i18n="menu.play">Play</span></button>
+    </section>
+    <!-- Scoring explainer: a quiet text link for the curious, below the menu. -->
+    <div class="menu-foot">
+      <button type="button" class="help-link" id="btn-help" aria-haspopup="dialog" data-i18n="help.link">How does scoring work?</button>
+    </div>
+    <a class="ig-link" href="https://www.instagram.com/charlieeandersen" target="_blank" rel="noopener noreferrer" data-i18n-aria="aria.instagram" aria-label="Instagram @charlieeandersen" title="@charlieeandersen">@</a>
+  </section>
+
+  <!-- Game layout: centre table, right hand info. -->
+  <main id="view-game" class="layout">
+
+    <section class="main-col">
+      <div class="status-line">
+        <span id="hand-info" class="title-line hidden" aria-hidden="true"></span>
+        <p id="table-notice" class="table-notice hidden" role="status"></p>
+        <button type="button" class="ghost finish-exam hidden" id="btn-finish-exam" data-i18n="btn.finishExam">Finish exam</button>
+        <button type="button" class="ghost finish-exam hidden" id="btn-finish-table" data-i18n="table.finish">Finish game</button>
+        <button type="button" class="icon-btn sidebar-toggle" id="btn-ranges" aria-controls="sidebar-right" aria-expanded="false" data-i18n-aria="ranges" aria-label="Ranges">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/></svg>
+        </button>
+      </div>
+
+      <div id="practice-area">
+
+        <div class="table-wrap">
+          <div class="table" id="table">
+            <div class="felt"></div>
+            <div class="pot" id="pot"></div>
+            <div class="board" id="board"></div>
+            <div class="seats" id="seats"></div>
+            <div class="bets" id="bets"></div>
+          </div>
+        </div>
+
+        <div class="hero-area">
+          <section class="feedback hidden" id="feedback" aria-live="polite">
+            <div id="fb-practice">
+              <div class="verdict" id="verdict"></div>
+              <div class="fb-grid">
+                <div class="fb-card">
+                  <h3 data-i18n="fb.why">Why</h3>
+                  <ul class="explanation" id="explanation"></ul>
+                  <button type="button" class="ghost small more-btn hidden" id="btn-more" aria-expanded="false" data-i18n="btn.more">More</button>
+                </div>
+                <div class="fb-card">
+                  <h3 data-i18n="fb.stats">Stats</h3>
+                  <table class="stats" id="stats-table"></table>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="big btn-next" id="btn-next"><span id="next-label" data-i18n="btn.next">Next hand</span> <kbd>N</kbd></button>
+          </section>
+          <section class="cpu-result hidden" id="cpu-result" aria-live="polite">
+            <h3 id="cpu-result-title"></h3>
+            <ul class="cpu-lines" id="cpu-result-lines"></ul>
+            <button type="button" class="big btn-next" id="btn-cpu-next"><span id="cpu-next-label" data-i18n="btn.next">Next hand</span> <kbd>N</kbd></button>
+          </section>
+          <div class="hero-cards" id="hero-cards"></div>
+          <div class="hero-info" id="hero-info"></div>
+        </div>
+
+        <div class="error-banner hidden" id="error-banner" role="alert">
+          <span id="error-text"></span>
+          <button type="button" class="ghost small" id="error-retry" data-i18n="btn.retry">Retry</button>
+        </div>
+
+        <section class="actions" id="actions">
+          <div class="action-row">
+            <button type="button" class="big btn-fold" id="btn-fold">
+              <span class="key">F</span><span class="label" data-i18n="btn.fold">Fold</span>
+            </button>
+            <button type="button" class="big btn-call" id="btn-call">
+              <span class="key">C</span><span class="label" id="call-label">Check</span>
+            </button>
+            <button type="button" class="big btn-raise" id="btn-raise">
+              <span class="key">R</span><span class="label" id="raise-label">Raise</span>
+            </button>
+          </div>
+          <div class="raise-ctl ctl-off hidden" id="raise-ctl">
+            <input type="range" id="raise-range" step="1" aria-label="Raise amount" data-i18n-aria="aria.raiseAmt">
+            <input type="number" id="raise-num" step="0.5" min="0" aria-label="Raise amount in big blinds" data-i18n-aria="aria.raiseAmtBB">
+            <div class="raise-quick">
+              <button type="button" class="ghost small" data-rq="min"><span class="rq-name" data-i18n="raise.min">Min</span><span class="rq-amt"></span></button>
+              <button type="button" class="ghost small" data-rq="half"><span class="rq-name" data-i18n="raise.half">1/2 pot</span><span class="rq-amt"></span></button>
+              <button type="button" class="ghost small" data-rq="threeq"><span class="rq-name">3/4 pot</span><span class="rq-amt"></span></button>
+              <button type="button" class="ghost small" data-rq="pot"><span class="rq-name" data-i18n="raise.pot">Pot</span><span class="rq-amt"></span></button>
+              <button type="button" class="ghost small" data-rq="allin"><span class="rq-name" data-i18n="raise.allin">All-in</span><span class="rq-amt"></span></button>
+            </div>
+          </div>
+          <!-- Phones: long press on Raise opens this exact-amount popover (positioned above the button by app.js) -->
+          <div class="raise-pop hidden" id="raise-pop" role="dialog" aria-modal="false" aria-labelledby="rp-title">
+            <p class="rp-title" id="rp-title">Raise to</p>
+            <div class="rp-row">
+              <button type="button" class="ghost rp-step" id="rp-minus" data-i18n-aria="aria.stepDown" aria-label="-0.5 BB">&minus;</button>
+              <label class="rp-field"><input type="number" id="rp-num" inputmode="decimal" step="0.5" min="0" data-i18n-aria="aria.raiseAmtBB" aria-label="Raise amount in big blinds"><span>BB</span></label>
+              <button type="button" class="ghost rp-step" id="rp-plus" data-i18n-aria="aria.stepUp" aria-label="+0.5 BB">+</button>
+            </div>
+            <p class="rp-range" id="rp-range"></p>
+            <div class="rp-actions">
+              <button type="button" class="ghost" id="rp-cancel">Cancel</button>
+              <button type="button" class="big btn-raise" id="rp-ok">Confirm</button>
+            </div>
+          </div>
+          <p class="hint" data-i18n="hint">F fold · C check/call · R raise · N next</p>
+        </section>
+
+
+      </div>
+
+<section class="panel table-end hidden" id="table-end" aria-labelledby="table-end-title"><div class="te-head"><h2 id="table-end-title"></h2><p class="te-sub" id="table-end-sub"></p></div><div class="kpis te-kpis"><div class="kpi"><span class="kpi-label" data-i18n="table.hands">Hands</span><span class="kpi-value" id="te-hands">0</span></div><div class="kpi"><span class="kpi-label" data-i18n="table.biggest">Biggest pot won</span><span class="kpi-value" id="te-biggest">0</span></div><div class="kpi"><span class="kpi-label" data-i18n="table.net">Net (BB)</span><span class="kpi-value" id="te-net">0</span></div><div class="kpi"><span class="kpi-label" data-i18n="table.winRate">Hands won</span><span class="kpi-value" id="te-win">&ndash;</span></div><div class="kpi"><span class="kpi-label" data-i18n="table.stack">Final stack (BB)</span><span class="kpi-value" id="te-stack">0</span></div></div><div class="te-actions"><button type="button" class="big btn-call" id="btn-table-again" data-i18n="table.again">Play again</button><button type="button" class="ghost hidden" id="btn-table-review" data-i18n="rv.analysis">Analysis</button><button type="button" class="ghost" id="btn-table-menu" data-i18n="btn.menu">Menu</button></div></section>
+      <!-- Exam summary (after Finish exam): a summary view and an analysis view; each scrolls inside itself. -->
+      <section class="panel exam-summary hidden" id="exam-summary" aria-labelledby="exam-results-title">
+        <div class="sum-view" id="sum-view">
+          <h2 id="exam-results-title" data-i18n="exam.results">Exam results</h2>
+          <nav class="pill-tabs" role="tablist" data-i18n-aria="aria.resultPages" aria-label="Results pages">
+            <button type="button" class="pill-tab active" role="tab" aria-selected="true" data-spage="0" data-i18n="exam.tab.results">Results</button>
+            <button type="button" class="pill-tab" role="tab" aria-selected="false" data-spage="1" data-i18n="exam.tab.bySpot">By spot</button>
+          </nav>
+          <div class="sum-scroll">
+            <div class="sp sp-0">
+            <div class="sum-hero">
+              <div class="exam-pct" id="sum-avg">&ndash;</div>
+              <p class="exam-meta" data-i18n="exam.avgOfGame">Average of the whole exam</p>
+            </div>
+            <div class="kpis">
+              <div class="kpi"><span class="kpi-label" data-i18n="exam.hands">Hands</span><span class="kpi-value" id="sum-hands">0</span></div>
+              <div class="kpi"><span class="kpi-label" data-i18n="exam.decisions">Decisions</span><span class="kpi-value" id="sum-decisions">0</span></div>
+              <div class="kpi"><span class="kpi-label" data-i18n="exam.bestSpot">Best spot</span><span class="kpi-value kpi-text" id="sum-best">&ndash;</span></div>
+              <div class="kpi"><span class="kpi-label" data-i18n="exam.worstSpot">Worst spot</span><span class="kpi-value kpi-text" id="sum-worst">&ndash;</span></div>
+            </div>
+            </div>
+            <div class="sp sp-1" hidden>
+            <div class="sum-grid">
+              <div>
+                <h3 data-i18n="exam.byPosition">By position</h3>
+                <div class="breakdown" id="sum-by-position"></div>
+              </div>
+              <div>
+                <h3 data-i18n="exam.byStreet">By street</h3>
+                <div class="breakdown" id="sum-by-street"></div>
+              </div>
+            </div>
+            </div>
+          </div>
+          <div class="sum-actions">
+            <button type="button" class="big btn-call" id="btn-analysis" data-i18n="rv.reviewGame">Review game</button>
+            <button type="button" class="big btn-call" id="btn-new-exam" data-i18n="btn.newExam">New exam</button>
+            <button type="button" class="ghost" id="btn-exam-menu" data-i18n="btn.menu">Menu</button>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- Side drawer (practice): the preflop ranges chart only. Closed by default; closes on an outside click or Esc. -->
+    <aside class="sidebar sidebar-right" id="sidebar-right" data-i18n-aria="ranges" aria-label="Ranges">
+      <section class="side-pane" data-pane="ranges" data-i18n-aria="aria.ranges" aria-label="Ranges">
+        <section class="ranges-pane hidden" id="helper-panel" data-i18n-aria="aria.ranges" aria-label="Ranges">
+          <div class="helper-controls">
+            <label class="field"><span data-i18n="ranges.players">Players</span><select id="helper-players"></select></label>
+            <label class="field"><span data-i18n="ranges.position">Position</span><select id="helper-position"></select></label>
+            <label class="field"><span data-i18n="ranges.facing">Facing</span><select id="helper-facing"></select></label>
+          </div>
+          <ul class="legend-list">
+            <li><i class="sw sw-raise"></i><span data-i18n="ranges.great">Great: raise (or 3-bet) with this hand here.</span></li>
+            <li><i class="sw sw-call"></i><span data-i18n="ranges.good">Good: check or call; a small bet is fine too.</span></li>
+            <li><i class="sw sw-fold"></i><span data-i18n="ranges.bad">Bad: fold this hand from here.</span></li>
+          </ul>
+          <div class="range-grid" id="helper-grid" role="table" data-i18n-aria="aria.rangeChart" aria-label="Preflop range chart"></div>
+          <p class="helper-note" id="helper-note"></p>
+        </section>
+
+      </section>
+
+    </aside>
+  </main>
+
+  <!-- Multiplayer mount point: mp.js renders here (the placeholder is replaced on mount). -->
+  <div id="mp-root" class="mp-root"><p class="mp-placeholder" data-i18n="mp.soon">Multiplayer is coming soon.</p></div>
+</div>
+
+<div class="drawer-backdrop hidden" id="drawer-backdrop"></div>
+<div class="sheet-backdrop hidden" id="sheet-backdrop"></div>
+
+
+<!-- Rulebook: ranking first (visual), then short collapsible sections on why plays are good or bad. -->
+<section class="sheet hidden" id="sheet-rules" role="dialog" aria-modal="true" aria-labelledby="rules-title">
+  <div class="sheet-head">
+    <h2 id="rules-title" data-i18n="rules.title">Rulebook</h2>
+    <button type="button" class="ghost small sheet-close" data-i18n="btn.close">Close</button>
+  </div>
+  <nav class="pill-tabs" role="tablist" data-i18n-aria="aria.rulePages" aria-label="Rulebook pages">
+    <button type="button" class="pill-tab active" role="tab" aria-selected="true" data-rpage="0" data-i18n="rules.tab.rank">Hand ranking</button>
+    <button type="button" class="pill-tab" role="tab" aria-selected="false" data-rpage="1" data-i18n="rules.tab.why">Why</button>
+  </nav>
+
+  <h3 class="rule-h" data-i18n="rules.rank.title">Hand ranking, best first</h3>
+  <ol class="rk-list" id="rules-ranking"></ol>
+
+  <h3 class="rule-h rule-h-gap" data-i18n="rules.why.title">Why a play is good or bad</h3>
+  <p class="rule-intro" data-i18n="rules.why.intro">Each section is one idea.</p>
+
+  <details class="rule">
+    <summary data-i18n="rules.pos.title">Position</summary>
+    <p data-i18n="rules.pos.body">Acting last means you see what everyone else does first.</p>
+    <svg class="rule-svg" viewBox="0 0 160 110" role="img" data-i18n-aria="aria.seatOrder" aria-label="Seat order around the table">
+      <ellipse cx="80" cy="55" rx="62" ry="40" class="rule-ring"/>
+      <text x="80" y="20" text-anchor="middle" class="rule-seat">UTG</text>
+      <text x="132" y="58" text-anchor="middle" class="rule-seat">CO</text>
+      <text x="80" y="98" text-anchor="middle" class="rule-seat hot">BTN</text>
+      <text x="28" y="58" text-anchor="middle" class="rule-seat">SB</text>
+      <text x="50" y="96" text-anchor="middle" class="rule-seat">BB</text>
+    </svg>
+    <p class="rule-ex" data-i18n="rules.pos.ex">Example: K♦ 9♦ is a reasonable open from the button.</p>
+  </details>
+  <details class="rule">
+    <summary data-i18n="rules.players.title">Number of players</summary>
+    <p data-i18n="rules.players.body">With more players, someone is more likely to hold a strong hand.</p>
+    <p class="rule-ex" data-i18n="rules.players.ex">Example: 7♣ 6♣ is playable heads-up.</p>
+  </details>
+  <details class="rule">
+    <summary data-i18n="rules.stack.title">Stack depth (money)</summary>
+    <p data-i18n="rules.stack.body">Your stack is your chips in big blinds (BB).</p>
+    <p class="rule-ex" data-i18n="rules.stack.ex">Example: A♠ 5♠ is a shove at 10 BB.</p>
+  </details>
+  <details class="rule">
+    <summary data-i18n="rules.styles.title">Opponents’ styles</summary>
+    <p data-i18n="rules.styles.body">Tight players fold a lot.</p>
+    <p class="rule-ex" data-i18n="rules.styles.ex">Example: the same bet means more from a passive player.</p>
+  </details>
+  <details class="rule">
+    <summary data-i18n="rules.board.title">Your hand and the board</summary>
+    <p data-i18n="rules.board.body">See what your cards make with the board.</p>
+    <p class="rule-ex" data-i18n="rules.board.ex">Example: on K♠ 7♦ 2♣ a small pair rarely wins.</p>
+  </details>
+  <details class="rule">
+    <summary data-i18n="rules.odds.title">Pot odds</summary>
+    <p data-i18n="rules.odds.body">Compare what you must pay with what you can win.</p>
+  </details>
+  <details class="rule">
+    <summary data-i18n="rules.score.title">What the % means</summary>
+    <p data-i18n="rules.score.body">100% is the best move. 0% is clearly wrong.</p>
+  </details>
+  <div class="rule-pager" id="rule-pager" hidden>
+    <button type="button" class="ghost small" id="rule-prev" data-i18n="pager.prev">Previous</button>
+    <span class="dots" id="rule-dots"></span>
+    <button type="button" class="ghost small" id="rule-next" data-i18n="pager.next">Next</button>
+  </div>
+</section>
+
+<!-- Progress and statistics: this session on top, long-term charts below. One entry point. -->
+<section class="sheet sheet-wide hidden" id="sheet-progress" role="dialog" aria-modal="true" aria-labelledby="progress-title">
+  <div class="sheet-head">
+    <h2 id="progress-title" data-i18n="prog.heading">Progress and statistics</h2>
+    <button type="button" class="ghost small sheet-close" data-i18n="btn.close">Close</button>
+  </div>
+  <nav class="pill-tabs" role="tablist" data-i18n-aria="aria.progressPages" aria-label="Progress pages">
+    <button type="button" class="pill-tab active" role="tab" aria-selected="true" data-ppage="0" data-i18n="prog.tab.overview">Overview</button>
+    <button type="button" class="pill-tab" role="tab" aria-selected="false" data-ppage="1" data-i18n="prog.tab.breakdown">Breakdown</button>
+  </nav>
+  <div class="pp pp-0">
+
+  <h3 class="prog-section" data-i18n="prog.longTerm">Long-term</h3>
+  <div class="seg" id="filter-group" role="group" aria-label="Mode filter" data-i18n-aria="prog.filterLabel">
+    <button type="button" class="seg-btn" data-pf="all"><span data-i18n="prog.filter.all">All</span></button>
+    <button type="button" class="seg-btn" data-pf="practice"><span data-i18n="mode.practice">Practice</span></button>
+    <button type="button" class="seg-btn" data-pf="exam"><span data-i18n="mode.exam">Exam</span></button>
+  </div>
+  <p class="empty-note" id="pg-empty" data-i18n="prog.empty">Play a few hands and your progress will appear here.</p>
+  <div class="kpis kpis-4">
+    <div class="kpi"><span class="kpi-label" data-i18n="prog.avg">Average score</span><span class="kpi-value" id="pg-avg">&ndash;</span><span class="kpi-sub" id="pg-trend"></span></div>
+    <div class="kpi"><span class="kpi-label" data-i18n="prog.decisions">Decisions</span><span class="kpi-value" id="pg-decisions">0</span></div>
+    <div class="kpi"><span class="kpi-label" data-i18n="prog.hands">Hands played</span><span class="kpi-value" id="pg-hands">0</span></div>
+    <div class="kpi"><span class="kpi-label" data-i18n="prog.streak">Best streak</span><span class="kpi-value" id="pg-streak">0</span></div>
+  </div>
+  <div class="chart-box" id="pg-chart"></div>
+  </div>
+  <div class="pp pp-1">
+  <div class="prog-cols">
+    <div><h3 data-i18n="prog.byPos">By position</h3><div class="breakdown" id="pg-position"></div></div>
+    <div><h3 data-i18n="prog.byStreet">By street</h3><div class="breakdown" id="pg-street"></div></div>
+    <div><h3 data-i18n="prog.byPlayers">By player count</h3><div class="breakdown" id="pg-players"></div></div>
+  </div>
+  <div class="weakest">
+    <p id="pg-weakest"></p>
+    <button type="button" class="big btn-call" id="btn-drill"><span data-i18n="btn.drill">Drill weakest spot</span></button>
+  </div>
+  <details class="menu-more">
+    <summary data-i18n="prog.more">Export or reset</summary>
+    <div class="menu-row">
+      <button type="button" class="ghost" id="btn-export" data-i18n="btn.export">Export JSON</button>
+      <button type="button" class="ghost danger" id="btn-reset-progress" data-i18n="btn.reset">Reset</button>
+    </div>
+  </details>
+  </div>
+</section>
+
+<script src="engine.js"></script>
+<script src="i18n.js"></script>
+<script src="bots.js"></script>
+<script src="game.js"></script>
+<script src="stats.js"></script>
+<script src="theme.js"></script>
+<script src="help.js"></script>
+<script src="symbols.js"></script>
+<script src="stadium.js"></script>
+<script src="seatcard.js"></script>
+<script src="anim.js"></script>
+<script src="sound.js"></script>
+<script src="ui-controls.js"></script>
+<script src="review.js"></script>
+<script src="review-icons.js"></script>
+<script src="review-ui.js"></script>
+<script src="app.js"></script>
+<script src="menu-hub.js"></script>
+<script src="mp.js"></script>
+<script src="mp-rooms.js"></script>
+</body>
+</html>

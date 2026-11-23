@@ -1,0 +1,128 @@
+/* Polish (round 8): main menu tiles (equal size, one row when the width allows, hover lift),
+   touch screens without shortcut hints, and a stronger winner highlight on solo seat plates.
+   Loaded last so it wins over the earlier menu rules. */
+
+/* Quick game: one-line notice when the blinds double (auto-hides in app.js). */
+.table-notice { margin: 0 0 0 8px; font-size: 13px; font-weight: 600; color: var(--gold, #e8c15a); }
+.table-notice.hidden { display: none; }
+
+/* ----- 1. Main menu mode tiles: equal size, one row when it fits ----- */
+[data-view="menu"] .mode-cards {
+  grid-auto-rows: 1fr !important;
+  align-items: stretch;
+  max-width: 980px;
+}
+[data-view="menu"] .mode-card {
+  height: auto !important;
+  min-height: 0 !important;
+  align-self: stretch !important;
+  box-sizing: border-box;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background-color 180ms ease;
+}
+/* Wide and short-and-wide windows: five equal columns, one row. */
+@media (min-width: 601px) {
+  [data-view="menu"] .mode-cards { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+}
+/* Phones (portrait): six half-columns, so the tiles wrap 3 + 2 and every tile stays the same size. */
+@media (max-width: 600px) {
+  /* 3 + 2: every tile has the same width and height; the second row is centred. */
+  [data-view="menu"] .mode-cards { display: flex !important; flex-wrap: wrap; justify-content: center; gap: 8px; grid-template-columns: none !important; }
+  [data-view="menu"] .mode-card {
+    flex: 0 0 calc((100% - 16px) / 3); width: calc((100% - 16px) / 3); height: 104px !important;
+    padding: 10px 8px !important; align-self: auto !important;
+    flex-direction: column !important; align-items: center !important; justify-content: center !important;
+    text-align: center; gap: 6px !important;
+  }
+  [data-view="menu"] .mode-card .mc-desc { display: none; }
+  [data-view="menu"] .mode-card { padding: 10px 6px !important; }
+  [data-view="menu"] .mode-card .mc-name { font-size: 13.5px; line-height: 1.25; max-width: 100%; text-align: center; text-wrap: balance; overflow-wrap: break-word; hyphens: auto; }
+}
+
+/* Hover: a subtle lift, a gold edge and a soft glow (transform and opacity only; 150-200 ms). */
+@media (hover: hover) and (pointer: fine) {
+  [data-view="menu"] .mode-card:hover:not(:disabled) {
+    transform: translateY(-2px); /* no scale: the row stays aligned */
+    box-shadow: 0 10px 24px rgb(0 0 0 / 0.35), 0 0 0 1px rgb(var(--gold-rgb, 230 180 60) / 0.5), 0 0 18px rgb(var(--gold-rgb, 230 180 60) / 0.22);
+  }
+}
+/* Keyboard focus keeps its outline (style.css); the lift does not replace it. */
+/* Short screens: the logo and settings gear keep a header band of their own; the tiles start below it. */
+@media (max-height: 560px) {
+  [data-view="menu"] .menu-view:not([data-step="settings"]) { padding-top: 52px !important; padding-bottom: 0 !important; }
+}
+
+/* ----- 2. Touch and phone screens: no keyboard shortcut hints (F / C / R / N chips) ----- */
+@media (pointer: coarse), (max-width: 600px) {
+  .big .key,
+  .btn-next kbd,
+  .hero-area > .feedback .btn-next kbd,
+  .hero-area > .feedback.expanded .btn-next kbd,
+  .mp-act kbd { display: none !important; }
+}
+
+/* ----- 3. Solo winner: gold ring, soft glow pulse (about 2 s), emphasised name and stack, '+amount' pop ----- */
+.seat.winner::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 0 2px rgb(var(--gold-rgb, 230 180 60) / 0.9), 0 0 16px rgb(var(--gold-rgb, 230 180 60) / 0.55);
+  animation: win-seat-pulse 2s ease-in-out 1 both;
+}
+@keyframes win-seat-pulse {
+  0%, 100% { opacity: 0.55; box-shadow: 0 0 0 2px rgb(var(--gold-rgb, 230 180 60) / 0.7), 0 0 10px rgb(var(--gold-rgb, 230 180 60) / 0.35); }
+  50% { opacity: 1; box-shadow: 0 0 0 3px rgb(var(--gold-rgb, 230 180 60) / 1), 0 0 26px rgb(var(--gold-rgb, 230 180 60) / 0.8); }
+}
+.seat.winner .seat-name,
+.seat.winner .seat-stack { color: var(--gold-text, var(--gold)); font-weight: 700; }
+.seat .win-pop {
+  position: absolute; left: 50%; top: 4px; z-index: 6; pointer-events: none; white-space: nowrap;
+  transform: translateX(-50%); padding: 1px 8px; border-radius: 999px;
+  background: var(--gold); color: var(--suit-ink, #111); font: 700 13px/1.4 var(--font-mono, monospace);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+  animation: win-pop-in 1.6s ease-out 1 both;
+}
+@keyframes win-pop-in {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(0.7); }
+  20% { opacity: 1; transform: translate(-50%, -4px) scale(1.12); }
+  35% { transform: translate(-50%, 0) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -6px) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-view="menu"] .mode-card { transition: none !important; }
+  [data-view="menu"] .mode-card:hover:not(:disabled) { transform: none !important; }
+  .seat.winner::after { animation: none !important; opacity: 1; }
+  .seat .win-pop { animation: none !important; }
+}
+
+/* Menu tiles: the hover lift and glow must not be clipped and must not create a scrollbar. */
+[data-view="menu"] *:has(.mode-card),
+[data-view="menu"] .mode-cards,
+[data-view="menu"] .mode-card {
+  overflow: visible !important;
+  scrollbar-width: none;
+}
+[data-view="menu"] *:has(.mode-card)::-webkit-scrollbar { display: none; }
+[data-view="menu"] .mode-cards { padding: 8px 6px 10px; margin: -8px -6px -10px; }
+
+/* Instagram link: a quiet "@" in the bottom-right corner of the main menu. */
+.ig-link {
+  position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom));
+  width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%;
+  font: 600 17px/1 var(--font-mono, monospace); color: var(--text-dim, #9a9488); text-decoration: none;
+  border: 1px solid rgb(255 255 255 / 0.12); background: rgb(255 255 255 / 0.03);
+  transition: color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+.ig-link:hover, .ig-link:focus-visible { color: var(--gold, #e6b43c); border-color: currentColor; transform: translateY(-2px); }
+@media (pointer: coarse) { .ig-link { width: 44px; height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .ig-link { transition: none; } .ig-link:hover { transform: none; } }
+
+/* Main menu: Play / Practice tiles blend into the background; the gold highlight shows on hover, focus and when open. */
+[data-view="menu"] .hub-main { background: transparent !important; border-color: transparent !important; box-shadow: none; }
+[data-view="menu"] .hub-main:hover,
+[data-view="menu"] .hub-main[aria-expanded="true"] { background: transparent !important; border-color: var(--gold, #d4af37) !important; }
+
+/* Practice has no money/stacks options: they only matter in modes that play with chips. */
+#menu-settings.is-practice label.check:has(#menu-money),
+#menu-settings.is-practice #set-stack-field,
+#menu-settings.is-practice label.field:has(#set-stacks),
+#menu-settings.is-practice #set-custom-field { display: none !important; }

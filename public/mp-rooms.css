@@ -1,0 +1,292 @@
+/* Multiplayer screen (public/mp-rooms.js): full-screen over the multiplayer view, dark theme. It never
+ * scrolls as a page: the tiles and panels fit; the table list and a tall create panel scroll inside their box.
+ * Tiles match the main menu hub (menu-hub.css). Every tap target is at least 44 px. */
+.mr-screen {
+  position: fixed; inset: 0; z-index: 40; box-sizing: border-box;
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+  padding: max(8px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+  background: var(--bg, #0b1118); color: var(--text, #e8edf3); font-family: var(--font, system-ui, sans-serif);
+}
+.mr-screen[hidden], .mr-screen [hidden] { display: none !important; }
+
+/* Header: back arrow top-left and the title. */
+.mr-head { display: flex; align-items: center; gap: 8px; min-height: 52px; flex: 0 0 auto; padding-right: 56px; /* room for the theme button */ }
+.mr-title { flex: 1 1 auto; margin: 0; font-family: var(--font-display, Georgia, serif); font-size: 22px; font-weight: 600; min-width: 0; }
+
+/* Shared surface: the same gradient, 1px subtle border and radius as the hub tiles. */
+.mr-choice, .mr-panel, .mr-row {
+  box-sizing: border-box; border: 1px solid rgb(var(--white-rgb, 255 255 255) / 0.10);
+  background: linear-gradient(180deg, rgb(var(--surface-rgb, 30 36 44) / 0.96), var(--surface, #1b2029));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+}
+
+/* Quiet buttons: transparent, 1px line; gold on hover and focus. */
+.mr-back, .mr-join, .mr-suggest, .mr-step, .mr-seg button {
+  min-height: 44px; box-sizing: border-box; margin: 0; padding: 0 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid rgb(var(--white-rgb, 255 255 255) / 0.16); border-radius: 12px;
+  background: transparent; color: var(--text, #e8edf3); font: inherit; font-weight: 600; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 180ms ease, color 180ms ease, background-color 180ms ease;
+}
+.mr-back { width: 44px; padding: 0; }
+.mr-back:hover, .mr-join:hover, .mr-suggest:hover, .mr-step:hover:not(:disabled), .mr-seg button:hover { border-color: var(--gold, #d4af37); color: var(--gold, #d4af37); }
+.mr-join { min-width: 84px; border-radius: 999px; font-size: 14px; }
+.mr-join:hover { background: rgb(var(--gold-rgb, 212 175 55) / 0.10); }
+.mr-suggest { min-height: 36px; font-size: 13px; border-radius: 999px; }
+.mr-step { width: 40px; height: 36px; min-height: 36px; padding: 0; font-size: 20px; line-height: 1; }
+.mr-step:disabled { opacity: 0.35; cursor: default; }
+
+/* Primary: gold, rounded, 48 px tall. */
+.mr-confirm {
+  min-height: 44px; box-sizing: border-box; margin: 0; padding: 0 24px; border: 0; border-radius: 12px;
+  background: var(--gold, #d4af37); color: var(--on-accent, #111); font: inherit; font-weight: 700; letter-spacing: 0.01em;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 6px 18px rgb(var(--gold-rgb, 212 175 55) / 0.22);
+  transition: filter 180ms ease, transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+}
+.mr-confirm:hover:not(:disabled) { filter: brightness(1.06); transform: translateY(-1px); }
+.mr-confirm:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+
+.mr-back:focus-visible, .mr-confirm:focus-visible, .mr-join:focus-visible, .mr-input:focus-visible,
+.mr-choice:focus-visible, .mr-row:focus-visible, .mr-suggest:focus-visible, .mr-step:focus-visible, .mr-seg button:focus-visible {
+  outline: 2px solid var(--gold, #d4af37); outline-offset: 3px;
+}
+
+/* Choose screen: two equal tiles; a tile's panel opens beside it (wide) or below it (narrow). */
+.mr-choose {
+  flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  overflow: hidden; padding: 8px 0 12px;
+}
+.mr-opts { display: flex; flex-direction: row; align-items: flex-start; justify-content: center; gap: 16px; width: 100%; max-width: 1040px; }
+.mr-opt { display: flex; flex-direction: row; align-items: flex-start; gap: 16px; flex: 0 0 auto; min-width: 0; }
+
+.mr-choice {
+  flex: 0 0 auto; width: clamp(170px, 22vw, 240px); height: clamp(150px, 26vh, 190px); box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  padding: 18px 16px; text-align: center; cursor: pointer; font: inherit; color: var(--text, #e8edf3);
+  border-radius: 16px;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.mr-choice:hover, .mr-choice[aria-expanded="true"] {
+  transform: translateY(-2px); border-color: var(--gold, #d4af37);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--gold, #d4af37), 0 0 22px rgba(212, 175, 55, 0.22);
+}
+.mr-choice-icon { display: inline-flex; color: var(--gold, #d4af37); }
+.mr-choice-name { font-size: 20px; font-weight: 700; letter-spacing: 0.01em; }
+.mr-choice-desc { font-size: 12.5px; line-height: 1.35; color: var(--muted, #9aa6b2); max-width: 24ch; text-wrap: balance; }
+
+/* Panel: slides in from its tile (opacity and transform, 240 ms). */
+.mr-panel {
+  width: min(500px, calc(100vw - 32px - 240px - 16px)); min-width: 0; max-height: calc(100dvh - 130px); overflow-y: auto;
+  padding: 14px 16px; border-radius: 16px; box-sizing: border-box;
+  animation: mrPanelIn 240ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes mrPanelIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+.mr-pform { display: grid; gap: 10px; }
+.mr-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; }
+.mr-span2 { grid-column: 1 / -1; }
+.mr-field { display: grid; gap: 4px; font-size: 12.5px; letter-spacing: 0.01em; color: var(--muted, #9aa6b2); min-width: 0; }
+.mr-input {
+  width: 100%; height: 40px; box-sizing: border-box; padding: 0 12px; font: inherit; font-size: 16px; color: var(--text, #e8edf3);
+  border: 1px solid rgb(var(--white-rgb, 255 255 255) / 0.16); border-radius: 12px; background: rgb(var(--scrim-rgb, 0 0 0) / 0.22);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+.mr-input:hover { border-color: rgb(var(--white-rgb, 255 255 255) / 0.30); }
+.mr-input:focus-visible { outline: none; border-color: var(--gold, #d4af37); box-shadow: 0 0 0 3px rgb(var(--gold-rgb, 212 175 55) / 0.28); }
+.mr-namerow { display: flex; align-items: center; gap: 8px; min-height: 26px; }
+.mr-namemsg { margin: 0; flex: 1 1 auto; font-size: 13px; color: var(--muted, #9aa6b2); min-height: 18px; }
+.mr-namemsg.is-ok { color: #6fcf8a; }
+.mr-namemsg.is-bad { color: #ff7b7b; }
+/* light page: the name-check states take the theme's text-safe status inks (4.5:1 on the page) */
+:root[data-bg-tone="light"] .mr-namemsg.is-ok { color: var(--raise-text); }
+:root[data-bg-tone="light"] .mr-namemsg.is-bad { color: var(--fold-text); }
+.mr-suggest[hidden] { display: none; }
+.mr-err { margin: 0; min-height: 0; font-size: 13px; color: #ff7b7b; }
+.mr-err:empty { display: none; }
+.mr-form-actions { display: flex; align-items: center; gap: 10px; }
+.mr-form-actions .mr-confirm { flex: 1 1 auto; }
+.mr-form-actions .mr-more-btn { flex: 0 0 auto; }
+
+/* Segmented controls and steppers (the lobby skin look, compact). */
+.mr-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.mr-seg button { min-width: 0; flex: 1 1 0; height: 36px; min-height: 36px; padding: 0 6px; font-size: 13px; border-radius: 10px; }
+.mr-more-btn { flex: 0 0 auto; min-height: 44px; box-sizing: border-box; margin: 0; padding: 0 14px; border: 1px dashed rgb(var(--white-rgb, 255 255 255) / 0.22); border-radius: 999px; background: transparent; color: var(--muted, #9aa6b2); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.mr-more-btn:hover, .mr-more-btn[aria-expanded="true"] { color: var(--gold, #d4af37); border-color: var(--gold, #d4af37); }
+.mr-more-btn:focus-visible { outline: 2px solid var(--gold, #d4af37); outline-offset: 3px; }
+.mr-more-box[hidden] { display: none; }
+.mr-seg button[aria-pressed="true"] { border-color: var(--gold, #d4af37); color: var(--gold, #d4af37); background: rgb(var(--gold-rgb, 212 175 55) / 0.14); }
+.mr-stepper { display: flex; align-items: center; gap: 8px; }
+.mr-stepval { flex: 1 1 auto; text-align: center; font-weight: 700; font-size: 15px; color: var(--text, #e8edf3); }
+.mr-latefixed { margin-top: 6px; }
+.mr-latefixed[hidden] { display: none; }
+
+/* Status line (list screen). */
+.mr-status { min-height: 20px; margin: 8px 0 4px; font-size: 14px; color: var(--muted, #9aa6b2); text-align: center; flex: 0 0 auto; }
+.mr-status:empty { display: none; }
+
+/* Room list: rows are cards; only the list scrolls. */
+.mr-list-wrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.mr-list {
+  flex: 1 1 auto; min-height: 0; margin: 0; padding: 4px 0 16px; list-style: none;
+  display: flex; flex-direction: column; gap: 10px;
+  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+}
+.mr-list:empty { flex: 0 0 0; padding: 0; }
+.mr-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px;
+  min-height: 72px; padding: 12px 14px; border-radius: 12px; cursor: pointer;
+  transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+.mr-row:hover { border-color: rgb(var(--gold-rgb, 212 175 55) / 0.55); }
+.mr-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.mr-name { font-weight: 700; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mr-meta { font-size: 12.5px; color: var(--muted, #9aa6b2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mr-dots { display: flex; align-items: center; gap: 5px; margin-top: 3px; }
+.mr-dot { width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; border: 1px solid rgb(var(--white-rgb, 255 255 255) / 0.35); }
+.mr-dot.on { background: var(--gold, #d4af37); border-color: var(--gold, #d4af37); }
+.mr-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.mr-badge { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; border: 1px solid rgb(var(--white-rgb, 255 255 255) / 0.16); background: rgb(var(--scrim-rgb, 0 0 0) / 0.2); white-space: nowrap; }
+.mr-badge.mr-playing { color: var(--gold-text, #e6c76a); border-color: rgb(var(--gold-rgb, 212 175 55) / 0.6); background: rgb(var(--gold-rgb, 212 175 55) / 0.12); }
+.mr-badge.mr-lobby { color: var(--muted, #9aa6b2); }
+.mr-row.mr-here { border-color: var(--gold, #d4af37); box-shadow: inset 3px 0 0 var(--gold, #d4af37); }
+.mr-you { color: var(--on-accent, #111); background: var(--gold, #d4af37); border-color: transparent; font-weight: 700; }
+
+/* Empty state: a short line, centred in the free space. */
+.mr-empty { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px 16px; text-align: center; }
+.mr-empty-text { margin: 0; font-size: 15px; color: var(--muted, #9aa6b2); }
+
+/* Narrow (phones and portrait tablets): tiles stacked as compact rows; each panel under its tile. The create
+   form keeps two columns; the blinds fields take the full width (.mr-wide). */
+@media (max-width: 720px) and (min-height: 521px) {
+  .mr-choose { justify-content: flex-start; }
+  .mr-opts { flex-direction: column; align-items: stretch; gap: 8px; max-width: 520px; }
+  .mr-opt { flex-direction: column; align-items: stretch; gap: 8px; }
+  .mr-choice { width: 100%; height: auto; min-height: 60px; flex-direction: row; justify-content: center; gap: 12px; padding: 10px 16px; text-align: left; }
+  .mr-choice-icon svg { width: 24px; height: 24px; }
+  .mr-choice-name { font-size: 18px; }
+  .mr-choice-desc { display: none; }
+  .mr-panel { width: 100%; max-height: calc(100dvh - 140px); padding: 12px 14px; }
+  .mr-wide { grid-column: 1 / -1; }
+}
+/* Phones about 640 px tall (360x640): tighter rows so the expanded create form still fits. */
+@media (max-width: 720px) and (min-height: 521px) and (max-height: 700px) {
+  .mr-head { min-height: 44px; }
+  .mr-choose { padding: 2px 0 4px; }
+  .mr-opts { gap: 4px; }
+  .mr-choice { min-height: 44px; padding: 4px 14px; }
+  .mr-panel { padding: 10px 12px; }
+  .mr-pform { gap: 6px; }
+  .mr-grid { gap: 4px 10px; }
+  .mr-namerow { min-height: 18px; }
+  .mr-input, .mr-seg button, .mr-step { height: 36px; min-height: 36px; }
+  .mr-more-btn, .mr-confirm { min-height: 40px; }
+}
+/* Short landscape (667x375, 844x390): tiles stay side by side, compact; the create panel fits without
+   scrolling (the More options button sits in the action row). */
+@media (max-height: 520px) {
+  .mr-head { min-height: 44px; }
+  .mr-choose { padding: 4px 0 4px; }
+  .mr-title { font-size: 18px; }
+  .mr-opts { gap: 12px; }
+  .mr-opt { gap: 12px; }
+  .mr-choice { height: 110px; min-height: 0; padding: 8px 10px; gap: 2px; width: 150px; }
+  .mr-choice-icon svg { width: 22px; height: 22px; }
+  .mr-choice-name { font-size: 15px; }
+  .mr-choice-desc { display: none; }
+  .mr-panel { width: min(460px, calc(100vw - 32px - 150px - 12px)); max-height: calc(100dvh - 56px); padding: 8px 12px; }
+  .mr-pform { gap: 4px; }
+  .mr-grid { gap: 6px 10px; }
+  .mr-more-box .mr-wide { grid-column: auto; }
+  .mr-field { gap: 2px; font-size: 11.5px; }
+  .mr-namemsg { font-size: 12px; }
+  .mr-input, .mr-seg button, .mr-step { height: 34px; min-height: 34px; }
+  .mr-seg button { height: 32px; min-height: 32px; }
+  .mr-step { width: 36px; height: 34px; min-height: 34px; }
+  .mr-more-btn, .mr-confirm { min-height: 36px; height: 36px; }
+  .mr-row { min-height: 56px; padding: 8px 12px; }
+  .mr-list { gap: 8px; }
+  .mr-empty { padding: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mr-choice, .mr-row, .mr-back, .mr-join, .mr-confirm, .mr-input, .mr-seg button, .mr-step, .mr-suggest, .mr-panel { transition: none !important; animation: none !important; }
+  .mr-choice:hover, .mr-choice[aria-expanded="true"], .mr-confirm:hover:not(:disabled) { transform: none; }
+}
+
+/* "You will join next hand" note on the table (mp.js updateJoinNote). */
+.mp-join-note { margin: 4px 0 0; font-size: 13px; text-align: center; color: var(--gold-text, #e6c76a); }
+.mp-join-note[hidden] { display: none !important; }
+
+/* Profile photo picker: circle preview beside the name input (Join and Create panels). */
+.mr-nameline { display: flex; align-items: flex-end; gap: 10px; min-width: 0; }
+.mr-nameline > .mr-field { flex: 1 1 auto; min-width: 0; }
+.mr-avpick { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.mr-av {
+  position: relative; width: 52px; height: 52px; border-radius: 50%; overflow: hidden; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  border: 1px solid rgb(var(--white-rgb, 255 255 255) / 0.22); background: #3a4656; color: #fff;
+  font-weight: 700; font-size: 18px; letter-spacing: 0.02em; user-select: none;
+}
+.mr-av-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mr-av-init { line-height: 1; }
+.mr-av-btns { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+.mr-av-choose, .mr-av-remove {
+  min-height: 36px; box-sizing: border-box; margin: 0; padding: 0 10px; font: inherit; font-size: 12.5px; font-weight: 600;
+  border: 1px solid rgb(var(--white-rgb, 255 255 255) / 0.16); border-radius: 999px; background: transparent;
+  color: var(--text, #e8edf3); cursor: pointer; white-space: nowrap; -webkit-tap-highlight-color: transparent;
+}
+.mr-av-choose:hover, .mr-av-remove:hover { border-color: var(--gold, #d4af37); color: var(--gold, #d4af37); }
+.mr-av-remove { color: var(--muted, #9aa6b2); }
+.mr-av-choose:focus-visible, .mr-av-remove:focus-visible { outline: 2px solid var(--gold, #d4af37); outline-offset: 3px; }
+.mr-avpick [hidden] { display: none !important; }
+
+/* Header chip: the player's photo, name and Edit (opens Settings > User). */
+.mr-me { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 46%; flex: 0 1 auto; padding: 4px 6px 4px 4px;
+  border: 1px solid rgb(var(--white-rgb, 255 255 255) / 0.12); border-radius: 999px; background: rgb(var(--scrim-rgb, 0 0 0) / 0.22); }
+.mr-me-av { position: relative; width: 32px; height: 32px; border-radius: 50%; overflow: hidden; flex: 0 0 auto; display: inline-flex;
+  align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 13px; }
+.mr-me-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mr-me-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; }
+.mr-me-name.is-empty { color: var(--muted, #9aa6b2); font-style: italic; }
+.mr-me-edit { min-height: 36px; box-sizing: border-box; margin: 0; padding: 0 10px; flex: 0 0 auto; border: 0; background: transparent;
+  color: var(--gold, #d4af37); font: inherit; font-size: 13px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.mr-me-edit:focus-visible { outline: 2px solid var(--gold, #d4af37); outline-offset: 2px; border-radius: 6px; }
+
+/* Blocking prompt: shown in place of the tiles until a username is saved. */
+.mr-needname { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  padding: 24px 16px; text-align: center; }
+.mr-needname[hidden] { display: none !important; }
+.mr-needname-icon { display: inline-flex; color: var(--gold, #d4af37); }
+.mr-needname-icon svg { width: 44px; height: 44px; }
+.mr-needname-title { margin: 0; font-family: var(--font-display, Georgia, serif); font-size: 22px; font-weight: 600; }
+.mr-needname-desc { margin: 0; max-width: 42ch; font-size: 14px; line-height: 1.45; color: var(--muted, #9aa6b2); }
+.mr-needname-go { margin-top: 4px; }
+
+/* Join panel: the table finder and the list inside the panel (the panel scrolls, the list scrolls first). */
+.mr-panel-join { display: flex; flex-direction: column; gap: 10px; }
+.mr-panel-join .mr-pform { min-height: 0; }
+.mr-panel-join .mr-list-wrap { max-height: min(56vh, 460px); display: flex; flex-direction: column; }
+.mr-panel-join .mr-list { max-height: min(56vh, 460px); flex: 0 1 auto; }
+.mr-panel-join .mr-empty { padding: 14px 8px; }
+.mr-findhint { margin: 0; font-size: 12.5px; color: var(--muted, #9aa6b2); }
+.mr-findhint:empty { display: none; }
+.mr-tfilter::-webkit-search-cancel-button { cursor: pointer; }
+
+/* Create panel: one card. Two columns at wide sizes, one column on phones. */
+.mr-panel-create .mr-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.mr-panel-create .mr-field { align-content: start; }
+.mr-panel-create .mr-seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.mr-panel-create .mr-seg button { min-width: 0; padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+@media (max-width: 1400px) and (min-width: 721px) {
+  .mr-panel-create .mr-seg button { font-size: 11.5px; letter-spacing: -0.01em; }
+}
+@media (max-width: 720px) {
+  .mr-panel-create .mr-grid { grid-template-columns: minmax(0, 1fr); }
+  .mr-panel-create .mr-span2 { grid-column: auto; }
+  .mr-me { max-width: 52%; }
+}
+@media (max-width: 420px) {
+  .mr-me-name { max-width: 9ch; }
+}

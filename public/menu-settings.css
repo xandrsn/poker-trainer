@@ -1,0 +1,164 @@
+/* Main menu settings: header gear (44px) and the right-hand side panel (language, volume, table look). */
+.topbar .icon-btn.settings-btn { width: 44px; height: 44px; min-width: 44px; }
+
+.set-backdrop {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgb(0 0 0 / 0.5);
+}
+.set-panel {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 81;
+  box-sizing: border-box; width: min(360px, calc(100vw - 48px)); overflow: hidden;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 16px; background: var(--surface); color: var(--text);
+  border-left: 1px solid var(--line); box-shadow: -16px 0 40px rgb(0 0 0 / 0.4);
+}
+.set-panel:focus { outline: none; }
+.set-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.set-head h2 { margin: 0; font-size: 20px; }
+/* Tabs: one section at a time, so the panel never has to fit all of them. The body scrolls inside the panel. */
+.set-tabs { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: var(--r-md, 12px); background: var(--surface-2, transparent); }
+.set-tab {
+  flex: 1 1 0; min-height: 40px; padding: 0 6px; border: 0; border-radius: 8px; cursor: pointer;
+  background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600;
+}
+.set-tab[aria-selected="true"] { background: var(--hl-user); color: var(--on-hl-user, var(--bg, #111)); }
+.set-tab:focus-visible { outline: 2px solid var(--hl-user); outline-offset: 2px; }
+.set-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.set-sec { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+.set-body .set-h { display: none; }
+/* Compact Table pane: the live preview and hints are left out here (the menu shows the colours live already). */
+.set-panel .tcol-preview, .set-panel .tcol-hint { display: none; }
+.set-panel #menu-theme-settings { gap: 8px; }
+.set-panel .tcol-group { gap: 4px; }
+.set-panel .tcol-sw { height: 26px; }
+.set-panel .tcol-title { font-size: 12px; }
+.set-h {
+  margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--muted);
+}
+.set-panel .set-sec .seg { display: flex; height: auto; min-height: 44px; padding: 3px; align-items: stretch; }
+.set-panel .seg-btn { display: flex; align-items: center; justify-content: center; min-height: 38px; min-width: 72px; line-height: 1; }
+.set-panel .set-h { line-height: 1.5; overflow: visible; }
+.set-panel .sound-row { display: flex; align-items: center; gap: 10px; }
+.set-panel .sound-row input[type="range"] { flex: 1 1 auto; min-width: 0; }
+
+/* The Look (palette) button belongs to the in-game screens; the panel's Table section covers it on the menu. */
+body[data-view="menu"] #btn-look { display: none !important; }
+
+/* Main menu: cards grow with their text (descriptions are never cut), and the header row keeps its own band
+   on short screens so the logo and icons never sit on top of the mode cards. */
+[data-view="menu"] .mode-card { min-height: 0 !important; height: auto !important; overflow: visible !important; }
+[data-view="menu"] .mode-cards { grid-auto-rows: max-content; grid-template-rows: none; align-content: start; height: auto !important; }
+[data-view="menu"] .mode-card { align-self: start; }
+@media (max-height: 500px) {
+  [data-view="menu"] .menu-view { padding-top: 60px; }
+}
+
+/* Main menu row 2: statistics and rules as smaller, secondary buttons (not modes). */
+.menu-tools { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 10px 0 0; }
+.tool-btn {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted);
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.tool-btn:hover { color: var(--text); border-color: var(--muted); }
+.tool-btn:focus-visible { outline: 2px solid var(--hl-user, currentColor); outline-offset: 2px; }
+.tool-btn svg { flex: 0 0 auto; opacity: .85; }
+
+/* Scoring explainer: a quiet text link at the foot of the menu. */
+.menu-foot { display: flex; justify-content: center; margin-top: 4px; }
+.help-link {
+  min-height: 36px; padding: 0 8px; border: 0; background: none; color: var(--muted);
+  font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; opacity: .8; cursor: pointer;
+}
+.help-link:hover { opacity: 1; color: var(--text); }
+.help-link:focus-visible { outline: 2px solid var(--hl-user, currentColor); outline-offset: 2px; }
+
+/* Setup screen: the advanced mode settings fold away by default. */
+.menu-advanced { margin: 4px 0 8px; }
+.menu-advanced > summary { cursor: pointer; min-height: 36px; display: flex; align-items: center; color: var(--muted); font-size: 14px; }
+.menu-advanced .set-grid { padding-top: 8px; }
+
+/* Settings panel, User section: name and photo kept on this device. */
+.user-row { display: flex; gap: 12px; align-items: flex-start; }
+.user-av {
+  flex: 0 0 auto; width: 72px; height: 54px; border-radius: 10px; overflow: hidden;
+  display: grid; place-items: center; background: var(--surface-2, transparent); border: 1px solid var(--line);
+  font-size: 22px; font-weight: 600; color: var(--muted);
+}
+.user-av img { width: 100%; height: 100%; object-fit: cover; }
+.user-fields { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-width: 0; }
+.user-fields input[type="text"] {
+  width: 100%; min-height: 40px; padding: 6px 10px; box-sizing: border-box; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--surface-2, transparent); color: inherit; font: inherit;
+}
+.user-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.user-pick { display: inline-flex; align-items: center; min-height: 40px; padding: 0 12px; cursor: pointer; position: relative; }
+.user-pick input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.user-pick:focus-within { outline: 2px solid var(--hl-user, currentColor); outline-offset: 2px; }
+.set-panel .user-fields .hint { margin: 0; }
+
+/* ===== Solo menu fit (round 7): short and phone screens show the whole menu with no scroll. =====
+   Compact = short window (landscape phones, 1024x600 and the like): mode cards lose their description line
+   (the menu foot link explains the scoring) and sit in one row or a 2-column grid; the setup panel is tightened. */
+@media (max-height: 680px) {
+  [data-view="menu"] .menu-view { padding: 8px 12px; overflow: hidden; }
+  [data-view="menu"] .menu-view > * { margin-top: auto; margin-bottom: auto; }
+  .menu-heading { font-size: 20px; margin: 0 0 6px; }
+  .mode-cards { gap: 8px; max-width: 980px; }
+  .mode-card { min-height: 0 !important; padding: 10px 12px !important; gap: 4px; }
+  .mode-card .mc-icon svg { width: 22px; height: 22px; }
+  .mc-desc { display: none; }
+  .mc-name { font-size: 16px; }
+  .menu-tools { margin-top: 8px; }
+  .tool-btn { min-height: 36px; padding: 0 12px; font-size: 13px; }
+  .menu-foot { margin-top: 0; }
+  .help-link { min-height: 32px; }
+  .menu-settings { margin-top: 0; padding: 10px 12px; gap: 0; }
+  .menu-settings .menu-grid { gap: 6px 12px; }
+  .menu-settings .menu-group { margin-bottom: 0; }
+  .menu-setup-row { margin-bottom: 6px; }
+  .menu-advanced { margin: 2px 0 4px; }
+  .menu-advanced > summary { min-height: 32px; font-size: 13px; }
+  .menu-settings .menu-label { margin-bottom: 2px; }
+  #menu-start { min-height: 44px; margin-top: 6px; }
+}
+@media (max-height: 680px) and (min-width: 601px) {
+  .mode-cards { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .menu-settings .menu-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-height: 680px) and (max-width: 600px) {
+  .mode-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .mode-card { padding-top: 6px; padding-bottom: 6px; }
+  [data-view="menu"] .menu-view { padding-top: 6px; padding-bottom: 6px; }
+  .menu-settings .check { min-height: 32px; }
+  .menu-settings .menu-group { margin-bottom: 0; }
+  .menu-settings .menu-label { margin-bottom: 0; }
+  .menu-settings .pers-list { margin: 0; }
+  .menu-setup-row { margin-bottom: 2px; }
+  .mode-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .menu-settings .menu-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  [data-view="menu"] .menu-view[data-step="settings"] .menu-tools,
+  [data-view="menu"] .menu-view[data-step="settings"] .menu-foot { display: none; }
+}
+@media (max-height: 680px) {
+  [data-view="menu"] .menu-view[data-step="settings"] .menu-tools,
+  [data-view="menu"] .menu-view[data-step="settings"] .menu-foot { display: none; }
+  .menu-settings > * { flex: 0 0 auto; }
+  .menu-settings .pers-list { display: flex; flex-wrap: wrap; gap: 2px 12px; }
+  .menu-advanced[open] .set-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding-top: 4px; }
+  .menu-advanced[open] .set-grid .hint { display: none; }
+  .menu-advanced[open] .set-grid .field span { font-size: 12px; }
+  .menu-setup-row .ghost.small { min-height: 36px; }
+}
+@media (max-height: 500px) {
+  .menu-settings { padding: 8px 10px; }
+  .menu-setup-row { margin-bottom: 4px; }
+  .menu-advanced[open] .set-grid .field select,
+  .menu-advanced[open] .set-grid .field input { min-height: 32px; height: 32px; padding-top: 2px; padding-bottom: 2px; }
+  .menu-advanced[open] .set-grid { gap: 2px 6px; }
+  #menu-start { min-height: 40px; margin-top: 4px; }
+  .menu-settings .field select, .menu-settings .field input { min-height: 34px; }
+}

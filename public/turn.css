@@ -1,0 +1,51 @@
+/* Turn indicator and volume control (public/sound.js sets body.turn-hero / body.turn-other).
+ * Only opacity, transform-free pseudo-element overlays and box-shadow: nothing here changes layout.
+ * Reduced motion: every loop below is inside prefers-reduced-motion: no-preference, so the static ring stays. */
+
+/* ----- volume control (menu and in-game settings) ----- */
+.sound-field { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2, 8px); margin-top: var(--s2, 8px); }
+.sound-field .menu-label { flex: 0 0 auto; }
+.sound-row { display: flex; align-items: center; gap: 8px; flex: 1 1 140px; min-width: 0; }
+.sound-row input[type="range"] { flex: 1 1 auto; min-width: 0; width: 100%; accent-color: var(--gold-text, #d9b25f); }
+.sound-out { min-width: 2.4em; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted, inherit); }
+
+/* ----- hero's turn: soft glow on the hero plate, thin accent along the action bar ----- */
+body.turn-hero #actions,
+body.turn-hero #mp-dock {
+  box-shadow: 0 -2px 0 0 var(--gold-text, #d9b25f), 0 -10px 22px -14px rgb(217 178 95 / 0.45), var(--elev-raised, none);
+}
+
+/* seat ring: the existing to-act ring breathes (opacity only) */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes turn-ring-breathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+  @keyframes turn-glow-breathe { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.9; } }
+
+  /* solo, hero to act: soft halo around the plate */
+  #table .seat.hero.to-act::after {
+    content: ''; position: absolute; inset: -5px; border-radius: inherit; pointer-events: none;
+    box-shadow: 0 0 16px 3px rgb(217 178 95 / 0.35);
+    animation: turn-glow-breathe 2.4s ease-in-out infinite;
+  }
+  /* solo, opponent to act: its ring pulses gently */
+  #table .seat.to-act:not(.hero)::before { animation: turn-ring-breathe 1.8s ease-in-out infinite; }
+  #table .seat.hero.to-act::before { animation: turn-ring-breathe 2.4s ease-in-out infinite; }
+
+  /* multiplayer, hero to act: halo on top of the existing turn-clock ring */
+  .mp-seat.me.turn::after {
+    content: ''; position: absolute; inset: -5px; border-radius: inherit; pointer-events: none;
+    box-shadow: 0 0 16px 3px rgb(217 178 95 / 0.35);
+    animation: turn-glow-breathe 2.4s ease-in-out infinite;
+  }
+}
+
+/* reduced motion: a static highlight only, no loops */
+@media (prefers-reduced-motion: reduce) {
+  #table .seat.hero.to-act::after {
+    content: ''; position: absolute; inset: -5px; border-radius: inherit; pointer-events: none;
+    box-shadow: 0 0 12px 2px rgb(217 178 95 / 0.25);
+  }
+  .mp-seat.me.turn::after {
+    content: ''; position: absolute; inset: -5px; border-radius: inherit; pointer-events: none;
+    box-shadow: 0 0 12px 2px rgb(217 178 95 / 0.25);
+  }
+}

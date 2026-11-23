@@ -1,0 +1,196 @@
+/* Shared seat plate (seatcard.js): states, face-down pair, position/style glossary bubbles.
+   Loaded after style.css and theme.css. Specificity is #table .seat.* so these win over the older seat rules. */
+
+/* live (still in the hand): a clear highlight ring in the user's highlight colour */
+#table .seat.in-hand {
+  opacity: 1;
+  filter: none;
+  outline: 2px solid var(--hl-user);
+  outline-offset: 2px;
+  box-shadow: var(--elev-raised);
+}
+#table .seat.in-hand.hero { outline-color: rgb(var(--raise-rgb) / 0.85); }
+
+/* acting seat: the hero's plate glows green (as in the reference image); an opponent to act gets a subtle ring */
+#table .seat.hero.to-act {
+  outline: 2px solid #35d07f;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px rgb(53 208 127 / 0.35), 0 0 18px rgb(53 208 127 / 0.55), var(--elev-raised);
+}
+#table .seat.to-act:not(.hero) {
+  outline: 1px solid rgb(255 255 255 / 0.3);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.08), var(--elev-raised);
+}
+
+/* folded: faded, greyed, no outline; the name and stack are dimmed too */
+#table .seat.folded {
+  opacity: 0.38;
+  filter: grayscale(0.85) saturate(0.2);
+  outline: none;
+  box-shadow: none;
+  border-style: dashed;
+  animation: none;
+}
+#table .seat.folded .seat-name,
+#table .seat.folded .seat-stack { color: var(--muted); }
+#table .seat.folded .seat-backs,
+#table .seat.folded .mini-cards { display: none; }
+
+#table .seat.busted { opacity: 0.28; filter: grayscale(0.8); outline: none; }
+
+/* face-down pair peeking above a live opponent: a small fan of card backs (24x34, 18x26 when compact).
+   The overhang (top) is reserved by layoutTable() so the plate never pushes the pair out of the table. */
+.seat-backs {
+  position: absolute; left: 50%; top: -31px; transform: translateX(-50%);
+  display: flex; gap: 4px; pointer-events: none; overflow: visible;
+}
+.seat-backs i {
+  display: block; width: 24px; height: 34px; box-sizing: border-box; border-radius: 4px;
+  border: 1px solid rgb(var(--gold-rgb) / 0.75);
+  background:
+    repeating-linear-gradient(45deg, transparent 0 3px, rgb(var(--gold-rgb) / 0.16) 3px 4px),
+    repeating-linear-gradient(-45deg, transparent 0 3px, rgb(var(--gold-rgb) / 0.16) 3px 4px),
+    var(--surface-2);
+  box-shadow: 0 2px 5px rgb(0 0 0 / 0.5);
+  transform-origin: 50% 100%;
+}
+.seat-backs i:first-child { transform: rotate(-6deg); }
+.seat-backs i:last-child { transform: rotate(6deg); }
+/* short tables (lvl-3): no room above the seats for the pair, so it is hidden and no overhang is reserved */
+#table.lvl-3 .seat-backs { display: none; }
+
+/* glossary: position badge and style tag have their own bubble; the seat tip steps aside while they are hovered */
+#table .seat[data-tip]:has(.pos-badge:hover)::after,
+#table .seat[data-tip]:has(.style-tag:hover)::after,
+#table .seat[data-tip]:has(.pos-badge:focus-visible)::after,
+#table .seat[data-tip]:has(.style-tag:focus-visible)::after { opacity: 0 !important; }
+.pos-badge[data-gloss], .style-tag[data-gloss] { cursor: help; }
+.pos-badge[data-gloss]:focus-visible, .style-tag[data-gloss]:focus-visible {
+  outline: 2px solid var(--gold); outline-offset: 2px;
+}
+
+.gloss-bubble {
+  position: fixed; z-index: 60;
+  display: flex; flex-direction: column; gap: 2px;
+  width: max-content; max-width: min(280px, calc(100vw - 16px));
+  padding: var(--s2) var(--s3);
+  background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  box-shadow: var(--elev-raised);
+  font-size: 14px; font-weight: 500; line-height: 1.4; text-align: left;
+  pointer-events: none;
+}
+.gloss-bubble[hidden] { display: none !important; }
+.gloss-bubble .gloss-title { font-weight: 700; color: var(--gold-text); }
+.gloss-bubble .gloss-line { display: block; }
+.gloss-bubble .gloss-you { color: var(--muted); font-style: italic; }
+
+/* ---------- symbols (symbols.js) replace the words for play style and last action; colour per meaning ---------- */
+#table .seat .style-tag.sym-tag, #table .seat .la-chip.sym-tag {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 20px; height: 20px; min-width: 0; max-width: none; padding: 0; margin: 2px auto 0; border-radius: 50%;
+  line-height: 0; font-size: 0; overflow: visible; text-overflow: clip; white-space: nowrap;
+  color: var(--sc, #c9ccd2); background: rgb(0 0 0 / 0.4);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.16), 0 1px 3px rgb(0 0 0 / 0.4);
+}
+#table .sym-tag .sym { display: block; width: 13px; height: 13px; flex: 0 0 auto; }
+.style-tag.style-tight { --sc: #7fb2ea; }
+.style-tag.style-loose { --sc: #6fd39a; }
+.style-tag.style-aggressive { --sc: #ff7a59; }
+.style-tag.style-passive { --sc: #b59ae6; }
+.style-tag.style-balanced { --sc: #e8c25a; }
+.la-chip.la-check { --sc: #9cc3e8; }
+.la-chip.la-call, .la-chip.la-limp { --sc: #6fd39a; }
+.la-chip.la-raise { --sc: #ff7a59; }
+.la-chip.la-bet { --sc: #e8c25a; }
+.la-chip.la-fold, .la-chip.la-out { --sc: #8a919c; }
+.la-chip.la-allin { --sc: #ff4fa3; }
+.la-chip.la-other { --sc: #c9ccd2; }
+.seat .la-chip.sym-tag .sym { width: 14px; height: 14px; }
+.pos-badge[data-gloss], .style-tag[data-gloss], .la-chip[data-gloss], .seat[data-gloss] { cursor: help; }
+.style-tag[data-gloss]:focus-visible, .la-chip[data-gloss]:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+/* a bot plate carries the style glossary itself: its last-action tip is replaced by the chip's own bubble */
+#table .seat[data-gloss]::after { opacity: 0 !important; }
+
+/* bot avatar: the play-style illustration in a tinted circle (the person silhouette stays for the hero) */
+#table .seat-avatar.bot {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; margin: 0 auto 3px; border-radius: 50%; color: var(--sc);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.14), 0 2px 5px rgb(0 0 0 / 0.45);
+}
+#table .seat-avatar.bot .sym { width: 19px; height: 19px; }
+#table .seat-avatar.bot.st-tight { --sc: #7fb2ea; background: radial-gradient(circle at 50% 30%, #2d4d70 0%, #142437 75%); }
+#table .seat-avatar.bot.st-loose { --sc: #6fd39a; background: radial-gradient(circle at 50% 30%, #2b5c44 0%, #14302a 75%); }
+#table .seat-avatar.bot.st-aggressive { --sc: #ff7a59; background: radial-gradient(circle at 50% 30%, #6a3328 0%, #33191a 75%); }
+#table .seat-avatar.bot.st-passive { --sc: #b59ae6; background: radial-gradient(circle at 50% 30%, #433566 0%, #22193a 75%); }
+#table .seat-avatar.bot.st-balanced { --sc: #e8c25a; background: radial-gradient(circle at 50% 30%, #6b5a26 0%, #332d16 75%); }
+#table.lvl-2 .seat-avatar.bot { width: 22px; height: 22px; margin-bottom: 2px; }
+#table.lvl-2 .seat-avatar.bot .sym { width: 14px; height: 14px; }
+
+/* multiplayer plates (mp.js uses these helpers): the same bot illustration as a round avatar */
+.mp-av.bot-style { display: inline-flex; align-items: center; justify-content: center; color: var(--sc, #c9ccd2); background: #1f2430; }
+.mp-av.bot-style .sym { width: 62%; height: 62%; }
+.mp-av.bot-style.st-tight { --sc: #7fb2ea; }
+.mp-av.bot-style.st-loose { --sc: #6fd39a; }
+.mp-av.bot-style.st-aggressive { --sc: #ff7a59; }
+.mp-av.bot-style.st-passive { --sc: #b59ae6; }
+.mp-av.bot-style.st-balanced { --sc: #e8c25a; }
+
+/* CPU plate: nothing may clip the peeking pair (the global overflow-y:hidden rule made the seat clip it), more breathing room, bigger cards */
+#table .seat { overflow: visible; padding: var(--s2) var(--s3); }
+#table .seat .mini-cards .card { width: 34px; padding: 3px 4px; font-size: 0.95rem; }
+
+/* no scrollbars inside a plate (they showed where the position badge goes); cards sit above the plate, not on the badge.
+   Every box inside a seat is overflow visible with no scrollbar (Windows classic included). */
+#table .seat, #table .seat *, #table .seat *::before, #table .seat *::after { scrollbar-width: none; }
+#table .seat .seat-backs, #table .seat .seat-backs i, #table .seat .seat-top, #table .seat .pos-badge, #table .seat .dealer-btn,
+#table .seat .seat-stack, #table .seat .seat-name, #table .seat .la-chip, #table .seat .mini-cards,
+#table .seat .mini-cards .card { overflow: visible; }
+#table .seat .style-tag { overflow: hidden; text-overflow: ellipsis; }
+/* badge and dealer button keep their size inside the seat top (a squeezed D looked like a smear) */
+#table .seat .seat-top > * { flex: 0 0 auto; }
+
+/* Rules / Progress / settings drawers cover the full height, above the header (the header no longer cuts into them) */
+.sheet-backdrop, .drawer-backdrop { top: 0; z-index: 44; }
+.drawer, #sheet-rules, #sheet-progress { top: 0; bottom: 0; z-index: 45; }
+
+/* Exam / practice / quick: the seat tooltips (::after) were laid out at opacity 0 past the table edge at the right and
+   made the table wrap scroll sideways by a few pixels (a scrollbar under the table). They exist only while hovered or
+   focused, and the wrap clips (no scroll box) with a margin so a hovered tip is not cut. */
+#table .seat[data-tip]::after { display: none; }
+#table .seat[data-tip]:hover::after, #table .seat[data-tip]:focus-visible::after { display: block; }
+.table-wrap { overflow: clip; overflow-clip-margin: 150px; }
+
+/* the state chip (check, call, raise, fold, ...) is never hidden and never overlapped: it sits in the plate's flow
+   under the stack, at every table level (style.css hid it on lvl-2/lvl-3 and on folded seats) */
+#table .seat .la-chip, #table.lvl-2 .seat .la-chip, #table.lvl-3 .seat .la-chip, #table .seat.folded .la-chip {
+  display: inline-flex; position: relative; z-index: 1; flex: 0 0 auto; margin-top: 3px;
+}
+
+/* compact level (lvl-4, tiny tables such as 844x390 with 5 players): the lvl-3 plate and chips, smaller again,
+   and a smaller pot pill, so every seat, chip and the pot fit between the seats (app.js layoutTable) */
+#table.lvl-4 .seat { padding: 1px 3px 2px; border-radius: 8px; }
+#table.lvl-4 .seat .seat-name { font-size: 10px; line-height: 1.1; }
+#table.lvl-4 .seat .seat-stack, #table.lvl-4 .seat .seat-pos { display: none; }
+#table.lvl-4 .bet-chip { font-size: 9px; padding: 0 4px 0 1px; }
+#table.lvl-4 .bet-chip .chip-disc, #table.lvl-4 .chip-disc { width: 11px; height: 11px; }
+#table.lvl-4 .pot { font-size: 10px; padding: 2px 6px; gap: 0; max-width: 60px; }
+#table.lvl-4 .pot::before { display: none; }
+#table.lvl-4 .pot .chip-disc { display: none; }
+#table.lvl-4 .pot .pot-val { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* the hero's to-act halo (turn.css) sat 5px outside the plate; on short tables the hero plate reaches the wrap's bottom
+   edge, so the halo made the table wrap scroll by a few pixels. The halo now hugs the plate and glows out with box-shadow
+   (box-shadow adds no scrollable overflow). */
+body #table .seat.hero.to-act::after { inset: 0; }
+
+/* the board row never clips its cards (a dealt card can rest a pixel past the row box) */
+#table .board { overflow: visible; }
+
+/* 360-420 px phones, short-table plate (lvl-3, 10px stack, ~38 px inside the plate): "100.0 BB" (45 px) clipped. The " BB"
+   unit is dropped there only; the action buttons and the bet chips still say BB. */
+@media (max-width: 420px) {
+  #table.lvl-3 .seat .seat-stack::after, #table.lvl-2 .seat .seat-stack::after { content: none; }
+}
+

@@ -1,0 +1,23 @@
+{
+  "name": "poker-trainer",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "cert": "node scripts/make-cert.js",
+    "turn-test": "node scripts/turn-test.js",
+    "e2e": "node test/e2e-mp.js",
+    "test": "node test/engine.test.js && node test/game.test.js && node test/stats.test.js && node test/i18n.test.js && node test/mp-client.test.js && node test/mp.test.js && node test/theme.test.js && node test/anim.test.js",
+    "audit": "node test/audit.js",
+    "bots-stats": "node test/bots-stats.js",
+    "e2e:solo": "node test/e2e-solo.js",
+    "e2e:menu": "node test/e2e-menu.js",
+    "e2e:feedback": "node test/e2e-feedback.js"
+  },
+  "dependencies": {
+    "ws": "^8.22.1"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.65.0"
+  }
+}

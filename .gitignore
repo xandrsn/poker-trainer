@@ -1,0 +1,14 @@
+node_modules/
+certs/
+logs/
+*.pem
+GAMER/
+logs/
+public-url.txt
+*.stackdump
+e2e-*.json
+rs_*.txt
+.vercel
+.e2e-shots/
+.claude/
+skill/

@@ -1,0 +1,99 @@
+/* Quick game (one table of bots, played to the end). Only overrides for the table mode and its menu/end panel. */
+
+/* Menu: the table settings show only for the quick game card; the players range is not used there. */
+.table-only { display: none; }
+.menu-settings.is-table .table-only { display: block; }
+.menu-settings.is-table .menu-group:has(#menu-pmin) { display: none; }
+.table-only .field-row { margin-bottom: 6px; }
+.table-only input[type="number"] {
+  width: 100%; min-height: 40px; padding: 6px 10px; border-radius: 10px;
+  border: 1px solid var(--line, rgba(0, 0, 0, .18)); background: var(--surface, #fff); color: inherit; font: inherit;
+}
+
+/* Table mode: no ranges drawer at all. */
+body.table-mode .ranges-pane { display: none !important; }
+
+/* End panel: fits the viewport without scrolling the page. */
+.table-end {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: clamp(8px, 1.6vh, 16px); margin: 0 auto; width: min(640px, 100%);
+  padding: clamp(12px, 2.4vh, 24px) clamp(12px, 3vw, 24px); box-sizing: border-box;
+  max-height: calc(100dvh - var(--topbar-h, 56px) - 16px); overflow: hidden;
+}
+.table-end.hidden { display: none; }
+.table-end h2 { margin: 0; font-size: clamp(22px, 4.2vh, 36px); line-height: 1.1; }
+.te-sub { margin: 4px 0 0; opacity: .8; font-size: clamp(13px, 1.9vh, 16px); }
+.te-kpis {
+  width: 100%; display: grid; gap: clamp(6px, 1vh, 10px);
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+}
+.te-kpis .kpi-value { font-size: clamp(18px, 3.4vh, 26px); }
+.te-kpis .kpi-label { font-size: clamp(11px, 1.6vh, 13px); }
+.te-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.te-actions .big { min-height: 44px; }
+
+@media (max-width: 480px) {
+  .te-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .te-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .table-end { gap: 6px; }
+}
+
+/* Exam and quick game: one full-width column. The hand info is a drawer over the table, closed by default.
+   The drawer is fixed (no layout shift): the table, the F/C/R row and the action bar never move when it opens.
+   Exam shows only neutral hand info here (position, players, street, stack, pot); no evaluation, ranges or stats. */
+#view-game.no-side { grid-template-columns: minmax(0, 1fr) !important; }
+#view-game.no-side > .sidebar-right {
+  position: fixed; top: 0; bottom: 0; right: 0; z-index: 22;
+  width: min(300px, 86vw); box-sizing: border-box; padding: 52px var(--s4) var(--s4);
+  background: var(--surface); border: 1px solid var(--line); border-right: 0;
+  box-shadow: var(--elev-overlay); transform: translateX(100%); visibility: hidden;
+  transition: transform var(--t-panel) var(--ease), visibility var(--t-panel);
+}
+#view-game.no-side > .sidebar-right.open { transform: none; visibility: visible; }
+#view-game.no-side > .sidebar-right > .side-pane { display: flex; flex: 1 1 auto; }
+/* The Ranges toggle is the only extra control: shown in practice (its own .hidden class decides), never in a table or exam. */
+body[data-view="game"] #btn-ranges { margin-right: 0; }
+body[data-view="game"] #btn-ranges.hidden { display: none !important; }
+body[data-view="game"] #btn-ranges:not(.hidden) { display: inline-grid !important; }
+
+/* no sidebar: the game column is centred in the window at any width (it used to stick to the left edge on wide screens) */
+#view-game.no-side { max-width: none; width: 100%; }
+#view-game.no-side .main-col { width: 100%; max-width: min(1280px, 100%); margin-inline: auto; justify-self: center; }
+
+/* Game view controls: the back arrow sits top-left (44px). The palette (Look) is not offered in a solo game:
+   the table is set in the main menu's settings. The right side keeps the Ranges toggle and Finish game. */
+body[data-view="game"] #btn-look { display: none !important; }
+body[data-view="game"] .game-back { left: var(--s2); right: auto; top: var(--s2); width: 44px; height: 44px; }
+@media (pointer: coarse), (max-height: 500px) {
+  body[data-view="game"] .game-back { width: var(--touch, 44px); height: var(--touch, 44px); }
+}
+
+/* Narrow or short game views: a 48px band at the top holds the floating icons (Finish game, the Ranges toggle,
+   the back arrow). The table starts below it, so no seat, its face-down cards or the pot can sit under those controls. */
+@media (max-width: 600px), (max-height: 500px) {
+  body[data-view="game"] .table-wrap { margin-top: 48px; }
+  body[data-view="game"] .status-line { top: 4px; }
+}
+
+/* Round 7 phones: action labels wrap instead of cutting ("Raise 100"), the ranges drawer grid fits 360 px. */
+@media (max-width: 600px) {
+  .big .label { white-space: normal; overflow: visible; line-height: 1.15; font-size: 13px; overflow-wrap: anywhere; text-align: center; }
+  .ranges-drawer .rg-cell, .ranges-pane .rg-cell { font-size: 9px; letter-spacing: -0.05em; aspect-ratio: auto; min-height: 20px; padding: 0; }
+  .ranges-drawer .rg-head, .ranges-drawer .rg-corner, .ranges-pane .rg-head, .ranges-pane .rg-corner { font-size: 9px; min-height: 18px; line-height: 18px; padding: 0; }
+  .ranges-drawer li, .ranges-pane li { font-size: 12px; line-height: 1.35; }
+  .ranges-drawer .range-grid { gap: 1px; }
+}
+
+/* Short screens (landscape phones, 600 px-high laptops): the ranges pane packs its selects, legend and 13x13 grid so
+   every line stays inside its box (the legend lines, the grid cells and the selects used to clip). */
+@media (max-height: 500px), (max-width: 600px) {
+  .ranges-pane .field, .ranges-drawer .field { height: auto; min-height: 0; margin-bottom: 2px; gap: 2px; }
+  .ranges-pane .helper-controls .field select, .ranges-drawer .helper-controls .field select { min-height: 26px; height: 26px; padding: 0 6px; font-size: 12px; }
+  .ranges-pane .legend-list li, .ranges-drawer li, .ranges-pane li { font-size: 11px; line-height: 1.25; }
+  .ranges-pane .range-grid { gap: 1px; }
+  .ranges-pane .rg-cell, .ranges-drawer .rg-cell { font-size: 9px; aspect-ratio: auto; min-height: 11px; padding: 0; line-height: 1.1; }
+  .ranges-pane .rg-head, .ranges-pane .rg-corner, .ranges-drawer .rg-head, .ranges-drawer .rg-corner { font-size: 9px; min-height: 11px; line-height: 11px; padding: 0; }
+  .ranges-pane .helper-note, .ranges-drawer .helper-note { font-size: 11px; min-height: 0; margin-top: 2px; }
+}
