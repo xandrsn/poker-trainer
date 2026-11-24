@@ -437,7 +437,7 @@ async function integration() {
     const wb = await b.waitFor((m) => m.t === 'welcome');
     assert.strictEqual(wb.you.host, false);
 
-    a.send({ t: 'addBot', style: 'tight' });
+    a.send({ t: 'addBot', style: 'lv1' });
     await a.waitFor((m) => m.t === 'lobby' && m.players.some((p) => p.bot));
 
     let st = core.initialState();

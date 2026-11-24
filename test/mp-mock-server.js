@@ -7,7 +7,7 @@ const net = require('net');
 const crypto = require('crypto');
 
 const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
-const STYLES = ['tight', 'loose', 'aggressive', 'passive', 'balanced'];
+const STYLES = require('../public/ladder.js').LADDER.map((b) => b.id);
 
 function encodeText(text) {
   const payload = Buffer.from(text, 'utf8');
@@ -192,7 +192,7 @@ function startMockServer(port) {
         if (!isHost(ctx)) return sendRaw(sock, { t: 'error', msg: 'Only the host can do that' });
         const seat = freeSeat();
         if (seat === null) return sendRaw(sock, { t: 'error', msg: 'The table is full' });
-        const style = STYLES.includes(msg.style) ? msg.style : 'balanced';
+        const style = STYLES.includes(msg.style) ? msg.style : 'lv1';
         const name = typeof msg.name === 'string' && msg.name.trim() ? msg.name.trim().slice(0, 16) : 'CPU ' + (seat + 1);
         players.push({ seat, bot: true, style, name, connected: true, host: false });
         return broadcastLobby();

@@ -8,7 +8,7 @@
  *       lang                'en' | 'es' (glossary language); default 'en'
  *       name                display name (string); default seat.name
  *       stackText           text for the stack line (e.g. "42.5") or null to hide it
- *       styleLabel          text for the style tag (bots only); null/'' hides it
+ *       bot                 true for a neural bot: its avatar and glossary; a "Name (Elo)" name shows the Elo apart
  *       lastText            last-action chip text; '' hides it
  *       dealerBtn           true to show the D button
  *       toAct               true when this seat is to act now
@@ -61,18 +61,10 @@
 
   var STYLE = {
     en: {
-      tight: ['Tight: plays few hands', 'Plays only strong starting hands and waits for a good spot. Typical hands: pairs and big cards.\nExploit: steal their blinds and fold to their raises unless you have a strong hand; they rarely bluff.'],
-      loose: ['Loose: plays many hands', 'Plays many hands, even weak ones, and sees lots of flops. Typical hands: suited connectors, any ace, small pairs.\nExploit: value bet thinner and bluff them less; their calls are wide.'],
-      aggressive: ['Aggressive: bets and raises a lot', 'Bets and raises often, even without a made hand. Typical: wide raises and bluffs.\nExploit: do not fold too much to their bets; check strong hands to let them bluff, call with medium hands.'],
-      passive: ['Passive: mostly calls', 'Mostly calls and checks, and rarely raises. Typical: calls with medium hands and bets only big hands.\nExploit: bet for value when you are ahead and bluff less; when they bet, take it seriously.'],
-      balanced: ['Balanced: normal play', 'Mixes strong and weak hands with normal aggression. Typical: standard ranges, few obvious tells.\nExploit: play by the book and watch for patterns over several hands.']
+      neural: ['Neural bot', 'A network that learned by playing millions of hands against itself. The number in brackets is its Elo: the higher, the stronger. It bluffs, and it varies its play in the same spot.']
     },
     es: {
-      tight: ['Tight: juega pocas manos', 'Juega solo manos iniciales fuertes y espera buen momento. Manos típicas: parejas y cartas altas.\nExplotar: róbale las ciegas y retírate ante sus subidas salvo que tengas mano fuerte; casi nunca farolea.'],
-      loose: ['Loose: juega muchas manos', 'Juega muchas manos, incluso débiles, y ve muchos flops. Manos típicas: conectores del mismo palo, cualquier as, parejas pequeñas.\nExplotar: apuesta por valor con manos más flojas y farolea menos; sus igualadas son anchas.'],
-      aggressive: ['Agresivo: apuesta y sube mucho', 'Apuesta y sube a menudo, incluso sin mano hecha. Típico: subidas amplias y faroles.\nExplotar: no te retires demasiado ante sus apuestas; pasa con manos fuertes para que farolee e iguala con manos medias.'],
-      passive: ['Pasivo: sobre todo iguala', 'Sobre todo iguala y pasa, y rara vez sube. Típico: iguala con manos medias y apuesta solo con manos grandes.\nExplotar: apuesta por valor cuando vas por delante y farolea menos; cuando apuesta, tómatelo en serio.'],
-      balanced: ['Equilibrado: juego normal', 'Mezcla manos fuertes y débiles con agresividad normal. Típico: rangos estándar, pocas pistas claras.\nExplotar: juega según el libro y busca patrones en varias manos.']
+      neural: ['Bot neuronal', 'Una red que aprendió jugando millones de manos contra sí misma. El número entre paréntesis es su Elo: cuanto más alto, más fuerte. Farolea y varía su juego en la misma situación.']
     }
   };
 
@@ -160,12 +152,12 @@
       card.appendChild(backs);
     }
 
-    // round avatar at the top centre of the plate: a play-style illustration for a bot (the plate carries the
-    // style glossary, so it still shows when a photo replaces this), a person silhouette for the hero
-    var botStyle = !isHero && opts.styleLabel && seat.style ? String(seat.style) : null;
-    var av = el('span', botStyle ? 'seat-avatar bot st-' + botStyle : 'seat-avatar');
+    // round avatar at the top centre of the plate: the network for a bot (the plate carries its
+    // glossary, so it still shows when a photo replaces this), a person silhouette for the hero
+    var botStyle = !isHero && opts.bot ? 'neural' : null;
+    var av = el('span', botStyle ? 'seat-avatar bot' : 'seat-avatar');
     av.setAttribute('aria-hidden', 'true');
-    if (botStyle) av.innerHTML = root.Symbols.svg(root.Symbols.styleIcon(botStyle));
+    if (botStyle) av.innerHTML = root.Symbols.svg('nodes');
     else av.appendChild(el('i'));
     card.appendChild(av);
     if (botStyle) {
@@ -183,11 +175,13 @@
     if (opts.dealerBtn) top.appendChild(el('span', 'dealer-btn', 'D'));
     card.appendChild(top);
 
-    card.appendChild(el('div', 'seat-name', opts.name != null ? opts.name : (seat.name || ('Seat ' + seat.seat))));
+    var name = String(opts.name != null ? opts.name : (seat.name || ('Seat ' + seat.seat)));
+    var withElo = botStyle && /^(.*\S) (\(\d+\))$/.exec(name);
+    card.appendChild(el('div', 'seat-name', withElo ? withElo[1] : name));
+    if (withElo) card.appendChild(el('div', 'seat-elo', withElo[2]));
     // the stack stays on a folded plate too; a small 'Folded' flag sits in the top row (it is not a stack line)
     if (opts.stackText != null && opts.stackText !== '') card.appendChild(el('div', 'seat-stack', opts.stackText));
     if (folded && !busted) top.appendChild(el('span', 'seat-flag', (opts.lang || currentLang) === 'es' ? 'Retirado' : 'Folded'));
-    // the play style is shown once: the avatar above (its glossary bubble is on the plate); no second style tag
     if (opts.lastText) { // every state (check, call, raise, fold, ...) is shown, folded seats too
       // the last action as a symbol; its name is the hover/tap bubble (data-gname)
       var act = root.Symbols.actionIcon(busted ? 'busted' : (seat.lastAction || opts.lastText));
@@ -283,9 +277,9 @@
 
   // Markup helpers for the multiplayer plates (mp.js builds its own seats): a bot's default avatar,
   // and the symbol for a style tag or a last action (the hover/tap bubble is bound by the caller).
-  function styleAvatarHtml(style) {
-    return '<span class="mp-av sm bot-style st-' + String(style) + '" aria-hidden="true">' +
-      root.Symbols.svg(root.Symbols.styleIcon(style)) + '</span>';
+  function styleAvatarHtml() {
+    return '<span class="mp-av sm bot-style" aria-hidden="true">' +
+      root.Symbols.svg('nodes') + '</span>';
   }
   function actionSymHtml(raw, label) {
     var act = root.Symbols.actionIcon(raw);

@@ -13,8 +13,8 @@ const { DiagLog } = require('./diag.js');
 
 const SEATS = 9;
 const MAX_MEDIA_HUMANS = 6;          // camera/mic mesh is only sized for small rooms
-const PERSONALITIES = ['tight', 'loose', 'aggressive', 'passive', 'balanced'];
-const DEFAULTS = { stack: 100000, sb: 500, bb: 1000, personalities: PERSONALITIES.slice(), stacks: 'equal',
+const Ladder = require(path.join(__dirname, '..', 'public', 'ladder.js'));
+const DEFAULTS = { stack: 100000, sb: 500, bb: 1000, stacks: 'equal',
   externalCallUrl: null, botShowCards: false, blindUpMin: 0, spectatorCards: 'live', lateStack: 'start', lateFixedBB: 20 };
 const SPECTATOR_CARDS = ['live', 'afterHand', 'off'];
 const LATE_STACKS = ['start', 'half', 'avg', 'fixed'];   // entry stack of a player who joins a running game
@@ -23,21 +23,20 @@ const PAUSE_AUTO_RESUME_MS = 10 * 60 * 1000;
 const STACK_MODES = ['equal', 'varied', 'custom'];
 const CHAT_MAX = 200, CHAT_KEEP = 50, CHAT_GAP_MS = 700;
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
-const BALANCED = { name: 'balanced balanced', looseness: 'balanced', aggression: 'balanced' };
-// Bot styles map onto PokerBots personas (styleOf(persona) gives the style back).
-const STYLE_PERSONA = {
-  tight: { name: 'tight balanced', looseness: 'tight', aggression: 'balanced' },
-  loose: { name: 'loose balanced', looseness: 'loose', aggression: 'balanced' },
-  aggressive: { name: 'balanced aggressive', looseness: 'balanced', aggression: 'aggressive' },
-  passive: { name: 'balanced passive', looseness: 'balanced', aggression: 'passive' },
-  balanced: BALANCED,
-};
 const ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 const AVATAR_RE = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/;
 const AVATAR_MAX_BYTES = 64 * 1024;  // ~240x180 JPEG/PNG/WebP photos
 const DEFAULT_TIMING = { botDelay: [500, 1200], actionMs: 45000, disconnectMs: 30000, showWindowMs: 5000,
   disconnectGraceMs: 5000, autoResumeMs: PAUSE_AUTO_RESUME_MS, blindMinuteMs: 60000,
   abandonedMs: 3 * 60 * 1000, emojiGoneMs: 60 * 60 * 1000 };
+
+// Ranked matches: a shorter clock, and a player gone this long forfeits.
+const RANKED_TIMING = { actionMs: 30000, disconnectMs: 20000, abandonedMs: 60000,
+  noShowMs: 45000 };                 // a player who has not arrived by then is dropped from the match
+const RESTORE_MIN_TURN_MS = 8000;    // clock floor after a room moves to another server
+const SNAP_FIELDS = ['settings', 'chat', 'shown', 'joinCount', 'autoplay', 'paused', 'pausedInfo', 'base', 'blindLevel', 'pendingDoubles',
+  'netChips', 'lastAct', 'roomName', 'createdAt', 'ranked', 'finished', 'out', 'rated', '_gameOverSent', '_announced'];
+const cryptoRng = () => crypto.randomInt(4294967296) / 4294967296;
 
 const EMOJI_MAX = 12, EMOJI_BYTES = 8192, EMOJI_DIM = 64, EMOJI_GAP_MS = 2000;
 const EMOJI_PACKS_MAX = 40;         // packs kept for clientIds without a seat (oldest seen dropped first)
@@ -71,8 +70,6 @@ function checkEmojiPng(data) {
   }
   throw new Error('bad emoji');
 }
-
-function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 function cleanName(v, what) {
   if (typeof v !== 'string') throw new Error((what || 'name') + ' must be a string');
@@ -122,29 +119,27 @@ function cleanExternalUrl(v) {
   if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error('externalCallUrl must be an http(s) URL');
   return v;
 }
-// Personality list: array of known types (at least one), or a boolean (true = all, false = balanced only).
-function cleanPersonalities(v) {
-  if (v === true) return PERSONALITIES.slice();
-  if (v === false) return ['balanced'];
-  if (!Array.isArray(v) || !v.length) throw new Error('personalities must list at least one of ' + PERSONALITIES.join(', '));
-  const bad = v.find((p) => PERSONALITIES.indexOf(p) < 0);
-  if (bad !== undefined) throw new Error('unknown personality ' + bad);
-  return PERSONALITIES.filter((p) => v.indexOf(p) >= 0);
-}
 
 class Room {
   // opts: { seed?, timing?: { botDelay:[min,max], actionMs, disconnectMs, nextHandMs } }
   constructor(opts) {
     opts = opts || {};
-    this.timing = Object.assign({}, DEFAULT_TIMING, opts.timing || {});
+    this.timing = Object.assign({}, DEFAULT_TIMING, opts.ranked ? RANKED_TIMING : {}, opts.timing || {});
     // Delay before the next deal defaults to the between-hands window.
     if (this.timing.nextHandMs == null) this.timing.nextHandMs = this.timing.showWindowMs;
-    this.settings = Object.assign({}, DEFAULTS, { personalities: PERSONALITIES.slice() });
+    this.settings = Object.assign({}, DEFAULTS);
     this.diag = opts.diagFile === false ? null
       : new DiagLog(opts.diagFile || path.join(__dirname, '..', 'logs', 'mp-diag.log'), opts.diagMaxBytes);
     this.chat = [];                            // last CHAT_KEEP messages, sent to joiners
     this.shown = {};                           // seat -> true: cards shown this hand (showHand)
     this.table = G.newTable({ maxSeats: SEATS, seed: opts.seed });
+    if (opts.seed == null) this.table.rng = cryptoRng; // a 32-bit seed could be searched from the cards seen
+    this.rankedService = opts.rankedService || null;
+    this.ranked = null;                        // {matchId, kind, players:[{id,name,rating}], bots:[same]} in a ranked match
+    this.finished = false;                     // the ranked match has a result
+    this.out = [];                             // finished entrants of a ranked match, last place first
+    this.rated = {};                           // clientId -> result message, for players who reconnect
+    this.onChange = null;                      // called after every state change (server/cluster.js)
     // seat -> { seat, clientId, name, avatar, bot, style, persona, connected, conn, joinOrder,
     //           startStack (custom stacks), kickPending }
     this.recs = new Array(SEATS).fill(null);
@@ -165,6 +160,174 @@ class Room {
     this._turn = null;                         // { key, seat, timer, left, due, fn }
     this._next = null;                         // { timer, left, due, fn } (next hand)
     this._syncSettings();
+    if (opts.ranked) this._setRanked(opts.ranked, opts.rankedSettings);
+  }
+
+  // ------------------------------------------------------------ ranked match
+  // Fixed settings and no host: a duel, or a table of several players. Bots take their seats now, at the end of the table.
+  // `out` lists the keys of finished entrants, last place first; `rated` keeps each player's result by clientId.
+  _setRanked(ranked, settings) {
+    if (settings) this._settings({ seat: -1 }, settings); // nobody is seated: the host seat is -1
+    this.ranked = ranked;
+    ranked.bots.forEach((bot, i) => {
+      const seat = ranked.players.length + i;
+      this.recs[seat] = { seat, clientId: null, name: bot.name, avatar: null, bot: true, nn: bot.id, style: bot.id,
+        persona: Ladder.persona(bot.id), connected: true, conn: null, joinOrder: ++this.joinCount, startStack: this.settings.stack, kickPending: false };
+      this._setStack(seat, this.settings.stack);
+    });
+    this._syncPersonas();
+  }
+
+  _ratedPlayer(conn) {
+    const p = conn.user && this.ranked.players.find((x) => x.id === conn.user.id);
+    if (!p) throw new Error('this match is between other players');
+    return p;
+  }
+  _rankedKey(rec) { return rec.bot ? 'bot_' + rec.nn : rec.clientId; } // a human clientId is 'user_' + id
+  _rankedAlive() { return this.recs.filter((rec) => rec && this.out.indexOf(this._rankedKey(rec)) < 0); }
+  _rankedSize() { return this.ranked.players.length + this.ranked.bots.length; }
+
+  // Deals as soon as everybody is seated. Players who do not arrive in time are dropped from the match.
+  _rankedReady() {
+    if (this.finished || this.autoplay) return;
+    if (this.recs.filter(Boolean).length === this._rankedSize()) {
+      clearTimeout(this._noShow);
+      this.autoplay = true;
+      this._startHand();
+      this._blindArm();
+    } else if (!this._noShow) {
+      this._noShow = setTimeout(() => {
+        if (!this.autoplay) this._rankedDrop(this.ranked.players.filter((p) => !this._human('user_' + p.id)).map((p) => p.id));
+      }, this.timing.noShowMs);
+    }
+  }
+
+  // Players who leave before the first hand, unrated. The match is void once fewer than two entrants are left.
+  _rankedDrop(ids) {
+    const drop = this.ranked.players.filter((p) => ids.indexOf(p.id) >= 0);
+    const rest = this.ranked.players.filter((p) => drop.indexOf(p) < 0);
+    const isVoid = !rest.length || rest.length + this.ranked.bots.length < 2;
+    const gone = isVoid ? this.ranked.players : drop;
+    const conns = [];
+    gone.forEach((p) => {
+      const rec = this._human('user_' + p.id);
+      if (!rec) return;
+      if (rec.conn) { conns.push(rec.conn); if (!isVoid) rec.conn.seat = null; }
+      if (!isVoid) this._vacate(rec.seat);
+    });
+    this.rankedService.abort(this.ranked, gone).then(() => {
+      const msg = { t: 'rated', kind: this.ranked.kind, void: true, reason: 'noshow', winner: null, players: [] };
+      if (isVoid) gone.forEach((p) => { this.rated['user_' + p.id] = msg; });
+      conns.forEach((c) => c.send(msg));
+      if (this.onChange) this.onChange();
+    }).catch((e) => console.error('ranked: could not cancel: ' + (e && e.stack || e)));
+    if (isVoid) this._rankedStop();
+    else { this.ranked.players = rest; this._rankedReady(); }
+    this._changed({ peers: true });
+  }
+
+  // Resigned or away for too long: last of those still playing. The seat folds until its hand is over.
+  _forfeit(seat, reason) {
+    const rec = this.recs[seat];
+    if (this.finished || !rec || this.out.indexOf(this._rankedKey(rec)) >= 0) return;
+    if (!this.autoplay) { this._rankedDrop([rec.clientId.slice(5)]); return; }
+    rec.gone = true;
+    if (this._turn && this._turn.seat === seat) this._dropTurn();
+    this._rankOut([rec], reason);
+    this._changed({});
+  }
+
+  // Between hands: who is out of chips. Out together: the larger stack left, then the larger stack lost, places higher.
+  _rankedSweep() {
+    if (!this.ranked || !this.autoplay || this.finished) return;
+    const seats = this.table.hand.seats;
+    this.recs.forEach((rec, seat) => { if (rec && rec.gone) this._setStack(seat, 0); });
+    const rank = (rec) => [this.table.seats[rec.seat].stack, seats[rec.seat].contributed];
+    const lost = this._rankedAlive().filter((rec) => this._eliminated(rec.seat)).sort((a, b) => {
+      const x = rank(a), y = rank(b);
+      return x[0] - y[0] || x[1] - y[1];
+    });
+    if (lost.length) this._rankOut(lost, 'busted');
+  }
+
+  // The places of these records are final (last place first). The match ends with one entrant or no human left.
+  _rankOut(recs, reason) {
+    const keys = recs.map((rec) => this._rankedKey(rec));
+    this.out.push(...keys);
+    const alive = this._rankedAlive();
+    if (alive.length <= 1 || alive.every((rec) => rec.bot)) {
+      if (alive.length === 1) { keys.push(this._rankedKey(alive[0])); this.out.push(keys[keys.length - 1]); }
+      this._rankedStop();
+    }
+    const of = this._rankedSize();
+    const top = this.finished && this.out.length === of ? this.out[of - 1] : null;
+    const winner = top && (this.recs.find((rec) => rec && this._rankedKey(rec) === top) || {}).name || null;
+    Promise.all(keys.filter((k) => /^user_/.test(k)).map((k) => {
+      const i = this.out.indexOf(k);
+      return this.rankedService.settle(this.ranked, k.slice(5), this.out.slice(0, i), of - i, reason);
+    })).then((all) => {
+      const players = all.filter(Boolean);
+      players.forEach((p) => {
+        const msg = this.rated['user_' + p.id] = { t: 'rated', kind: this.ranked.kind, void: false, reason, winner, place: p.place, of, players };
+        const rec = this._human('user_' + p.id);
+        if (rec && rec.conn) rec.conn.send(msg);
+      });
+      if (this.onChange) this.onChange();
+    }).catch((e) => console.error('ranked: could not save the result: ' + (e && e.stack || e)));
+  }
+
+  _rankedStop() {
+    this.finished = true;
+    this.autoplay = false;
+    clearTimeout(this._noShow);
+    this._dropTurn();
+    this._clearNext();
+    this._blindDisarm();
+  }
+
+  // ------------------------------------------------------------ moving between servers
+  // Plain-data copy of the room. Avatars and custom emoji are left out: clients send theirs again.
+  snapshot() {
+    const s = { at: Date.now() };
+    SNAP_FIELDS.forEach((k) => { s[k] = this[k]; });
+    s.removed = Array.from(this.removed);
+    s.table = Object.assign({}, this.table, { rng: undefined });
+    s.recs = this.recs.map((r) => r && Object.assign({}, r, { conn: undefined, graceTimer: undefined, abandonTimer: undefined, avatar: null }));
+    s.turn = this._turn && { key: this._turn.key, seat: this._turn.seat, left: this._leftOf(this._turn) };
+    s.blindLeft = this._leftOf(this._blindClock);
+    return s;
+  }
+
+  // Every human starts disconnected and reclaims the seat with the token (or the account) as usual.
+  static restore(s, opts) {
+    const room = new Room(Object.assign({}, opts, { seed: undefined, room: undefined,
+      timing: Object.assign({}, s.ranked ? RANKED_TIMING : {}, opts && opts.timing) }));
+    SNAP_FIELDS.forEach((k) => { if (s[k] !== undefined) room[k] = s[k]; });
+    room.removed = new Set(s.removed);
+    const rng = room.table.rng;
+    Object.assign(room.table, s.table, { rng });
+    s.recs.forEach((rec, seat) => {
+      room.recs[seat] = rec;
+      if (!rec || rec.bot) return;
+      rec.conn = null;
+      rec.graceTimer = null;
+      if (!room.finished) room._armAbandon(seat, rec);
+      room._armGrace(rec);
+    });
+    const gone = Date.now() - s.at;
+    if (s.turn && !room.finished) {
+      const key = s.turn.key;
+      const left = room.paused ? s.turn.left : Math.max(RESTORE_MIN_TURN_MS, s.turn.left - gone);
+      room._turn = { key, seat: s.turn.seat, timer: null, left, due: 0, fn: () => room._turnTimeout(key) };
+      room._runTimer(room._turn);
+    }
+    if (s.blindLeft != null) {
+      room._blindClock = { timer: null, left: room.paused ? s.blindLeft : Math.max(0, s.blindLeft - gone), due: 0, fn: () => room._blindTick() };
+      room._runTimer(room._blindClock);
+    }
+    if (room.paused) room._armAutoResume(Math.max(0, room.pausedInfo.autoResumeAt - Date.now()));
+    room._advance();
+    return room;
   }
 
   // ------------------------------------------------------------ connections
@@ -184,18 +347,22 @@ class Room {
       rec.conn = null;
       // The seat stays reserved; it shows as disconnected only after the grace period.
       this._clearGrace(rec);
-      this._armAbandon(seat, rec);
-      rec.graceTimer = setTimeout(() => {
-        rec.graceTimer = null;
-        if (!rec.conn && this.recs[seat] === rec && !this._disposed) {
-          rec.connected = false;
-          this._changed({ peers: true });
-        }
-      }, this.timing.disconnectGraceMs);
+      if (!this.finished) this._armAbandon(seat, rec);
+      this._armGrace(rec);
       // A player on turn who drops gets at most the short clock; the running clock never restarts.
       if (this._turn && this._turn.seat === seat) this._shortenTurn();
     }
     this._changed({ peers: true });
+  }
+
+  _armGrace(rec) {
+    rec.graceTimer = setTimeout(() => {
+      rec.graceTimer = null;
+      if (!rec.conn && this.recs[rec.seat] === rec && !this._disposed) {
+        rec.connected = false;
+        this._changed({ peers: true });
+      }
+    }, this.timing.disconnectGraceMs);
   }
 
   _clearGrace(rec) {
@@ -211,6 +378,7 @@ class Room {
     rec.abandonTimer = setTimeout(() => {
       rec.abandonTimer = null;
       if (this._disposed || this.recs[seat] !== rec) return;
+      if (this.ranked) { this._forfeit(seat, 'left'); return; }
       if (this._freeable(seat)) { this._vacate(seat); this._changed({ peers: true }); }
     }, this.timing.abandonedMs);
   }
@@ -227,6 +395,7 @@ class Room {
     this._clearNext();
     this._blindDisarm();
     this._clearPauseTimer();
+    clearTimeout(this._noShow);
     this.recs.forEach((rec) => { if (rec) { this._clearGrace(rec); this._disarmAbandon(rec); } });
   }
 
@@ -263,6 +432,9 @@ class Room {
         case 'diag': return this._diag(conn, msg);
         case 'needKey': return this._needKey(conn, msg);
         case 'rtc': return this._rtc(conn, msg);
+        case 'resign':
+          if (!this.ranked) throw new Error('not a ranked match');
+          return this._forfeit(conn.seat, 'resign');
         default: throw new Error('unknown message ' + msg.t);
       }
     } catch (e) {
@@ -274,7 +446,8 @@ class Room {
   // -------------------------------------------------------------- lobby ops
   _join(conn, msg) {
     if (conn.seat != null) throw new Error('already joined');
-    const clientId = typeof msg.clientId === 'string' && ID_RE.test(msg.clientId) ? msg.clientId : newId();
+    const player = this.ranked ? this._ratedPlayer(conn) : null;
+    const clientId = player ? 'user_' + player.id : typeof msg.clientId === 'string' && ID_RE.test(msg.clientId) ? msg.clientId : newId();
     const avatar = msg.avatar === undefined ? undefined : cleanAvatar(msg.avatar);
     const highlight = msg.highlight === undefined ? undefined : cleanHighlight(msg.highlight);
     if (msg.clientId !== undefined && this.removed.has(clientId)) {
@@ -284,7 +457,8 @@ class Room {
     let rec = this._human(clientId);
     if (rec) {
       // The clientId is public (peers see it); only the seat's secret token may reclaim it.
-      if (typeof msg.token !== 'string' || !rec.token || msg.token !== rec.token) throw new Error('this seat belongs to another player');
+      // In a ranked match the signed-in account is the proof instead.
+      if (!player && (typeof msg.token !== 'string' || !rec.token || msg.token !== rec.token)) throw new Error('this seat belongs to another player');
       // Reclaim the seat: the old socket (another tab) is dropped.
       if (rec.conn && rec.conn !== conn) this._evict(rec.conn, 'connected from another window');
       rec.conn = conn;
@@ -294,7 +468,7 @@ class Room {
       if (avatar !== undefined) rec.avatar = avatar;
       if (highlight !== undefined) rec.highlight = highlight;
     } else {
-      const name = cleanName(msg.name);
+      const name = player ? player.name : cleanName(msg.name);
       if (this._humanCount() >= MAX_MEDIA_HUMANS && !this._takeOverAbandoned()) {
         throw new Error('room is full (max ' + MAX_MEDIA_HUMANS + ' players)');
       }
@@ -324,6 +498,8 @@ class Room {
     for (const [id, pack] of this.emojis) {
       if (pack.emojis.length) conn.send({ t: 'emojiPack', clientId: id, emojis: pack.emojis.slice() });
     }
+    if (this.rated[clientId]) conn.send(this.rated[clientId]);
+    if (this.ranked) this._rankedReady();
     this._changed({ peers: true });
   }
 
@@ -384,7 +560,7 @@ class Room {
   _profile(conn, msg) {
     const rec = this.recs[conn.seat];
     if (!rec || rec.bot) throw new Error('no seat to update');
-    const name = msg.name === undefined ? undefined : cleanName(msg.name);
+    const name = msg.name === undefined || this.ranked ? undefined : cleanName(msg.name);
     const avatar = msg.avatar === undefined ? undefined : cleanAvatar(msg.avatar);
     const highlight = msg.highlight === undefined ? undefined : cleanHighlight(msg.highlight);
     if (name !== undefined) rec.name = name;
@@ -434,13 +610,13 @@ class Room {
   _addBot(conn, msg) {
     this._requireHost(conn);
     this._requireNotPaused();
-    const style = msg.style === undefined ? 'balanced' : msg.style;
-    if (!Object.prototype.hasOwnProperty.call(STYLE_PERSONA, style)) throw new Error('unknown style');
+    const style = msg.style === undefined ? Ladder.LADDER[Math.floor(Math.random() * Ladder.LADDER.length)].id : msg.style;
+    if (!Ladder.level(style)) throw new Error('unknown style');
     const seat = this.recs.indexOf(null);
     if (seat < 0) throw new Error('table is full');
-    const name = msg.name === undefined ? cap(style) + ' bot' : cleanName(msg.name, 'bot name');
+    const name = msg.name === undefined ? Ladder.pickName(style, this.recs.map((r) => r && r.name)) : cleanName(msg.name, 'bot name');
     const avatar = msg.avatar === undefined ? null : cleanAvatar(msg.avatar);
-    const rec = { seat, clientId: null, name, avatar, bot: true, style, persona: STYLE_PERSONA[style],
+    const rec = { seat, clientId: null, name, avatar, bot: true, style, persona: Ladder.persona(style),
       connected: true, conn: null, joinOrder: ++this.joinCount, startStack: this.settings.stack, kickPending: false };
     this.recs[seat] = rec;
     this._setStack(seat, this._begin(rec));
@@ -456,9 +632,9 @@ class Room {
     if (!rec || !rec.bot) throw new Error('no bot at that seat');
     if (msg.style !== undefined && msg.style !== rec.style) {
       this._requireIdle();
-      if (!Object.prototype.hasOwnProperty.call(STYLE_PERSONA, msg.style)) throw new Error('unknown style');
+      if (!Ladder.level(msg.style)) throw new Error('unknown style');
       rec.style = msg.style;
-      rec.persona = STYLE_PERSONA[msg.style];
+      rec.persona = Ladder.persona(msg.style);
     }
     if (msg.name !== undefined) rec.name = cleanName(msg.name, 'bot name');
     if (msg.avatar !== undefined) rec.avatar = cleanAvatar(msg.avatar);
@@ -511,7 +687,7 @@ class Room {
     this._changed({ peers: true });
   }
 
-  // `randomness` is retired (CPU behaviour follows the personalities): accepted and ignored.
+  // `randomness` and `personalities` are retired (a bot is its Elo level): accepted and ignored.
   _settings(conn, msg) {
     this._requireHost(conn);
     this._requireNotPaused();
@@ -524,7 +700,6 @@ class Room {
     if (msg.stack !== undefined) s.stack = intIn(msg.stack, 1, 1e9, 'stack');
     if (msg.sb !== undefined) s.sb = intIn(msg.sb, 1, 1e6, 'sb');
     if (msg.bb !== undefined) s.bb = intIn(msg.bb, 2, 1e6, 'bb');
-    if (msg.personalities !== undefined) s.personalities = cleanPersonalities(msg.personalities);
     if (msg.stacks !== undefined) {
       if (STACK_MODES.indexOf(msg.stacks) < 0) throw new Error("stacks must be 'equal', 'varied' or 'custom'");
       s.stacks = msg.stacks;
@@ -545,7 +720,7 @@ class Room {
     }
     // The external call link can change at any time; the rest only between hands.
     // Only a real change counts: the table's settings dialog re-sends every field, unchanged ones included.
-    const blindsOrStacks = ['stack', 'sb', 'bb', 'personalities', 'stacks'].some((k) => JSON.stringify(s[k]) !== JSON.stringify(this.settings[k]));
+    const blindsOrStacks = ['stack', 'sb', 'bb', 'stacks'].some((k) => JSON.stringify(s[k]) !== JSON.stringify(this.settings[k]));
     if (blindsOrStacks) this._requireIdle();
     if (s.sb > s.bb) throw new Error('sb must not exceed bb');
     // Only a real change to the stack or the blinds is checked, so an unchanged stack after blind-ups still saves.
@@ -614,14 +789,18 @@ class Room {
     this.paused = true;
     this.pausedInfo = { by: conn.seat, name: rec ? rec.name : '', since: now, autoResumeAt: now + this.timing.autoResumeMs };
     this._freezeTimers();
+    this._armAutoResume(this.timing.autoResumeMs);
+    this._changed({});
+  }
+
+  _armAutoResume(ms) {
     this._clearPauseTimer();
     this._pauseTimer = setTimeout(() => {
       this._pauseTimer = null;
       if (this._disposed || !this.paused) return;
       this._unpause();
       this._changed({});
-    }, this.timing.autoResumeMs);
-    this._changed({});
+    }, ms);
   }
 
   _resume(conn) {
@@ -765,6 +944,7 @@ class Room {
     const rec = this.recs[conn.seat];
     this._requireNotPaused();
     if (!rec || rec.bot) throw new Error('no seat to rebuy');
+    if (this.ranked) throw new Error('no rebuys in a ranked match');
     // Allowed mid-hand when this seat is not in the running hand (its chips are not in play).
     if (this._handActive() && this.table.hand.seats[conn.seat].dealt) throw new Error('wait until the hand ends');
     if (!this._eliminated(conn.seat)) throw new Error('you still have chips');
@@ -780,6 +960,7 @@ class Room {
       if (msg.turn !== this._turnKey()) return;
     }
     if (this.paused) throw new Error('the game is paused');
+    if (this.finished) throw new Error('the match is over');
     if (this._isOut(conn.seat)) throw new Error('you are out - spectating');
     if (!hand || hand.over) throw new Error('no hand in progress');
     if (hand.toAct !== conn.seat) throw new Error('not your turn');
@@ -865,8 +1046,10 @@ class Room {
     const seat = hand.toAct;
     const rec = this.recs[seat];
     try {
-      if (rec && rec.kickPending) {
+      if (rec && (rec.kickPending || rec.gone)) {
         this._apply(seat, () => G.act(this.table, seat, 'fold'));
+      } else if (rec && rec.nn) {
+        this._apply(seat, () => NN().step(this.table, seat, rec.nn));
       } else if (rec && rec.bot) {
         this._apply(seat, () => G.stepBot(this.table));
       } else {
@@ -918,7 +1101,7 @@ class Room {
 
   // Keeps exactly one timer for the current decision, and one for the next hand.
   _advance() {
-    if (this._disposed) return;
+    if (this._disposed || this.finished) return;
     const hand = this.table.hand;
     if (hand && hand.over && this._announced !== hand.no) { this._announced = hand.no; this._announceWins(hand); }
     if (hand && !hand.over && hand.toAct != null) {
@@ -928,7 +1111,7 @@ class Room {
         const seat = hand.toAct;
         const rec = this.recs[seat];
         let ms;
-        if (rec && rec.kickPending) ms = 0;
+        if (rec && (rec.kickPending || rec.gone)) ms = 0;
         else if (rec && rec.bot) ms = this.timing.botDelay[0] + Math.random() * (this.timing.botDelay[1] - this.timing.botDelay[0]);
         else ms = rec && rec.conn ? this.timing.actionMs : this.timing.disconnectMs;
         this._turn = { key: key, seat: seat, timer: null, left: ms, due: 0, fn: () => this._turnTimeout(key) };
@@ -940,7 +1123,8 @@ class Room {
     if ((!hand || hand.over) && !this._next && this._canAutoStart()) {
       this._next = { timer: null, left: this.timing.nextHandMs, due: 0, fn: () => {
         this._next = null;
-        if (this._canAutoStart()) this._startHand();
+        // A blind doubling may have just eliminated someone: then no hand starts and the game may be over.
+        if (this._canAutoStart() && !this._startHand()) this._changed({});
       } };
       this._runTimer(this._next);
     }
@@ -1008,11 +1192,12 @@ class Room {
 
   // ------------------------------------------------------------ broadcasts
   _changed(opts) {
-    if (!this._handActive()) { this._finishLeaves(); this._sweepAbandoned(); }
+    if (!this._handActive()) { this._rankedSweep(); this._finishLeaves(); this._sweepAbandoned(); }
     this._checkGameOver();
     // Arm timers first so the broadcast can announce nextHandAt.
     this._advance();
     this._broadcast(!!(opts && opts.peers));
+    if (this.onChange) this.onChange();
   }
 
   // One player left with chips after a showdown: the game is over (standings, autoplay stops).
@@ -1035,7 +1220,7 @@ class Room {
     this.recs.forEach((rec, seat) => {
       if (!rec) return;
       if (rec.kickPending) { this._vacate(seat); return; }
-      if (rec.bot && this._eliminated(seat)) {
+      if (rec.bot && !this.finished && this._eliminated(seat)) {
         this._vacate(seat);
         const entry = { t: 'chat', system: true, kind: 'botOut', name: rec.name, time: Date.now() };
         this.chat.push(entry);
@@ -1053,7 +1238,7 @@ class Room {
   // A seat is freeable when it is a human socket-less seat that no running hand holds.
   _freeable(seat) {
     const rec = this.recs[seat];
-    if (!rec || rec.bot || rec.conn || rec.kickPending) return false;
+    if (!rec || rec.bot || rec.conn || rec.kickPending || this.ranked) return false;
     const hs = this._handActive() && this.table.hand.seats[seat];
     return !(hs && hs.dealt);
   }
@@ -1097,11 +1282,19 @@ class Room {
       const p = { seat: seat, name: rec.name, avatar: rec.avatar || null, highlight: rec.highlight || null, bot: rec.bot, waiting: this._isWaiting(seat),
         connected: rec.bot ? true : rec.connected, host: seat === host, camera: false,
         stack: this.table.seats[seat].stack, startStack: this._startOf(rec) };
+      if (this.ranked || rec.bot) p.rating = this._ratingOf(rec);
       if (rec.kickPending) p.leaving = true; // removed by the host; leaves when this hand ends
       if (rec.bot) p.style = rec.style; else p.clientId = rec.clientId;
       out.push(p);
     });
     return out;
+  }
+
+  _ratingOf(rec) {
+    if (!this.ranked) return Ladder.level(rec.style).table;
+    if (rec.bot) return this.ranked.bots.find((b) => b.id === rec.nn).rating;
+    const p = this.ranked.players.find((x) => 'user_' + x.id === rec.clientId);
+    return p ? p.rating : null;
   }
 
   // Busted humans: out of the seats for play, still connected (chat, camera, watching).
@@ -1166,6 +1359,7 @@ class Room {
         revealed: faceUp,
         connected: rec.bot ? true : rec.connected,
       };
+      if (this.ranked || rec.bot) s.rating = this._ratingOf(rec);
       if (obsShown) s.shownTo = 'observers';
       if (rec.bot) s.style = rec.style;
       seats.push(s);
@@ -1200,6 +1394,7 @@ class Room {
     return this.recs.find((r) => r && !r.bot && !r.kickPending && r.clientId === clientId) || null;
   }
   _hostSeat() {
+    if (this.ranked) return -1; // nobody may change a ranked match
     // the earliest joiner who is still connected; a seat that dropped never keeps the host role from the others
     let best = null;
     const pick = (needConnected) => this.recs.forEach((rec) => {
@@ -1305,18 +1500,16 @@ class Room {
   _syncSettings() {
     this.table.cfg.bb = this.settings.bb;
     this.table.cfg.sb = this.settings.sb;
-    this.table.cfg.personalities = this.settings.personalities.slice();
   }
-  // A bot plays its own style when that personality is enabled, otherwise as a balanced player.
   _syncPersonas() {
     this.recs.forEach((rec, seat) => {
       if (!rec || !rec.bot) return;
-      const enabled = this.settings.personalities.indexOf(rec.style) >= 0;
-      this.table.seats[seat].persona = enabled ? rec.persona : BALANCED;
+      this.table.seats[seat].persona = rec.persona;
     });
   }
   _settingsOut() {
-    return Object.assign({}, this.settings, { blindLevel: this.blindLevel, nextBlindUpAt: this._nextBlindUpAt() });
+    return Object.assign({}, this.settings, { blindLevel: this.blindLevel, nextBlindUpAt: this._nextBlindUpAt() },
+      this.ranked ? { ranked: true, kind: this.ranked.kind } : {});
   }
   // Epoch ms of the next progressive doubling; null while off, paused or idle.
   _nextBlindUpAt() {
@@ -1329,7 +1522,8 @@ class Room {
   }
 }
 
+const NN = () => require('./nnbot.js'); // loaded on first use: the networks are only needed in ranked matches
 function newId() { return crypto.randomBytes(9).toString('base64url'); }
 function newToken() { return crypto.randomBytes(18).toString('base64url'); }
 
-module.exports = { Room, SEATS, STYLE_PERSONA, DEFAULTS, checkEmojiPng, EMOJI_MAX, EMOJI_BYTES, EMOJI_DIM, EMOJI_GAP_MS };
+module.exports = { Room, SEATS, DEFAULTS, checkEmojiPng, EMOJI_MAX, EMOJI_BYTES, EMOJI_DIM, EMOJI_GAP_MS };

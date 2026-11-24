@@ -6,6 +6,7 @@
   'use strict';
 
   var E = (typeof window !== 'undefined' && window.PokerEngine) || require('./engine.js');
+  var Ladder = (typeof window !== 'undefined' && window.PokerLadder) || require('./ladder.js');
   var Bots = (typeof window !== 'undefined' && window.PokerBots) || require('./bots.js');
 
   var BB = 100, SB = 50;
@@ -71,17 +72,18 @@
     session.bank = (session.bank || 0) + residue;
     session.levelBB = newBB;
   }
-  // Enabled personality types. Accepts an array of names (unknown names ignored, never empty),
-  // or the legacy booleans: true = all types, false = balanced only.
+  // Who can sit down: bot levels (ids of ladder.js), or rule-based types (tests and audits; the booleans are theirs:
+  // true = all types, false = balanced only). Unknown names are ignored, never empty.
   function enabledTypes(o) {
     var all = Bots.TYPES;
     if (o === false) return ['balanced'];
     if (!Array.isArray(o)) return all.slice();
-    var out = all.filter(function (t) { return o.indexOf(t) >= 0; });
+    var out = all.concat(Ladder.LADDER.map(function (b) { return b.id; })).filter(function (t) { return o.indexOf(t) >= 0; });
     return out.length ? out : ['balanced'];
   }
   function pickPersona(rng, types) {
     var name = types[Math.floor(rng() * types.length)];
+    if (Ladder.level(name)) return Ladder.persona(name);
     var p = Bots.PERSONAS.filter(function (x) { return x.type === name; })[0];
     return { name: p.name, type: p.type, looseness: p.looseness, aggression: p.aggression };
   }
@@ -110,18 +112,21 @@
       ? (Number(o.seed) >>> 0)
       : (Math.floor(Math.random() * 4294967296) >>> 0);
     var rng = mulberry(seed);
-    var seats = [];
+    var seats = [], names = [];
     for (var i = 0; i <= cpus; i++) {
       var isHero = i === 0;
       var bbStack = seatStackBB(stacks, i, stackBB, o.customStacks, rng);
+      var persona = (isHero && !o.allBots) ? null : pickPersona(rng, types);
+      var lv = persona && !isHero && Ladder.level(persona.type);
+      if (lv) names[i] = Ladder.pickName(lv.id, names, rng);
       seats.push({
         idx: i,
-        name: isHero ? 'Hero' : 'CPU ' + i,
+        name: isHero ? 'Hero' : lv ? names[i] + ' (' + lv.table + ')' : 'CPU ' + i,
         isHero: isHero,
         isBot: isHero ? !!o.allBots : true,
         stack: Math.round(bbStack * BB),
         busted: false,
-        persona: (isHero && !o.allBots) ? null : pickPersona(rng, types),
+        persona: persona,
       });
     }
     return {
@@ -653,7 +658,7 @@
         folded: !h.dealt || h.folded,
         busted: !h.dealt,
         isHero: i === forIdx,
-        style: s.persona ? Bots.styleOf(s.persona) : 'balanced',
+        style: !s.persona || Ladder.level(s.persona.type) ? 'balanced' : Bots.styleOf(s.persona),
         lastAction: !h.dealt ? 'busted' : (h.lastAction === 'pending' ? '' : h.lastAction),
         preflopRole: h.role || null,
         reveal: h.reveal ? h.cards.slice() : null,
@@ -698,6 +703,19 @@
     var live = hand.seats.filter(function (h, j) { return j !== idx && h.dealt && !h.folded; });
     return live.length === 1 && live[0] === hand.seats[0] && !hand.seats[0].folded;
   }
+  // The networks, or null. shortcut: rule-based stand-ins play until the download ends (or offline), until starting a game waits for it.
+  function neural() {
+    var nn = typeof window !== 'undefined' ? window.PokerNN : require('./nn.js');
+    return nn && nn.ready() ? nn : null;
+  }
+  function nnDecision(nn, session, idx, L, lv) {
+    var d = nn.decide(session, idx, L, lv.tnet, lv.ttemp, session.rng);
+    // One BB above an all-in: snapping to the half-BB grain below then never leaves a few chips behind.
+    if (d.amount >= L.maxRaiseTo) d.amount = L.maxRaiseTo + session.hand.bb;
+    if (d.amount) d.amount = bbOf(d.amount, session.hand.bb);
+    return d;
+  }
+
   // Bot turn: decide with PokerBots, apply the result, return the event.
   function stepBot(session) {
     var hand = session.hand;
@@ -708,7 +726,8 @@
     if (!seat.isBot) throw new Error('seat ' + idx + ' is not a bot');
     var L = legalFor(session, hand, idx);
     var sc = buildScenario(session, idx);
-    var d = Bots.decide({
+    var lv = Ladder.level(seat.persona.type), nn = lv && neural();
+    var d = nn ? nnDecision(nn, session, idx, L, lv) : Bots.decide({
       scenario: sc,
       key: hand.no + ':' + hand.actions,
       legal: {
@@ -716,7 +735,7 @@
         minRaiseTo: bbOf(L.minRaiseTo, hand.bb), maxRaiseTo: bbOf(L.maxRaiseTo, hand.bb),
         canRaise: L.canRaise, canCheck: L.canCheck,
       },
-    }, { index: idx, type: seat.persona.type, looseness: seat.persona.looseness, aggression: seat.persona.aggression },
+    }, { index: idx, type: lv ? 'balanced' : seat.persona.type, looseness: seat.persona.looseness, aggression: seat.persona.aggression },
     { seed: session.cfg.seed });
     var action = d.action, amount = null;
     if (action === 'raise') {

@@ -8,7 +8,6 @@ const PokerEngine = (function () {
   const RANKS = '23456789TJQKA';
   const SUITS = 'shdc';
   const NC = 1326; // two-card combinations
-  const STYLES = ['tight', 'loose', 'aggressive', 'passive', 'balanced'];
   const CAT_NAMES = ['High card', 'Pair', 'Two pair', 'Three of a kind', 'Straight',
     'Flush', 'Full house', 'Four of a kind', 'Straight flush'];
   const STYLE_MULT = { tight: 0.8, loose: 1.3, aggressive: 1.1, passive: 0.9, balanced: 1 };
@@ -104,8 +103,7 @@ const PokerEngine = (function () {
       v_role_open: 'opened', v_role_3bet: '3-bet', v_role_4bet: '4-bet', v_role_call_open: 'flatted an open',
       v_role_call_3bet: 'called a 3-bet', v_role_call_4bet: 'called a 4-bet', v_role_limp: 'limped',
       v_role_bb_check: 'checked his option', v_role_default: 'played an unknown line', v_role_pending: 'has not acted yet',
-      style_tight: 'tight', style_loose: 'loose', style_aggressive: 'aggressive', style_passive: 'passive', style_balanced: 'balanced',
-      v_line: '{pos} ({style}) {role}', v_none: 'no live villains', v_more: '+{n} more',
+      v_line: '{pos} {role}', v_none: 'no live villains', v_more: '+{n} more',
       b1_raise: 'Raise: {e} chance to win, plus {fe} chance they fold, makes it the best line.',
       b1_call: 'Call: {e} chance to win beats the {req} you need.', b1_check: 'Check: {e} chance to win realises the pot for free.',
       b1_fold: 'Fold: {e} chance to win is below the {req} needed.',
@@ -193,8 +191,7 @@ const PokerEngine = (function () {
       v_role_open: 'abrió', v_role_3bet: 'resubió', v_role_4bet: 're-resubió', v_role_call_open: 'igualó una apertura',
       v_role_call_3bet: 'igualó una resubida', v_role_call_4bet: 'igualó una re-resubida', v_role_limp: 'limpeó',
       v_role_bb_check: 'pasó su opción', v_role_default: 'jugó una línea desconocida', v_role_pending: 'aún no ha actuado',
-      style_tight: 'cerrado', style_loose: 'suelto', style_aggressive: 'agresivo', style_passive: 'pasivo', style_balanced: 'equilibrado',
-      v_line: '{pos} ({style}) {role}', v_none: 'sin villanos activos', v_more: '+{n} más',
+      v_line: '{pos} {role}', v_none: 'sin villanos activos', v_more: '+{n} más',
       b1_raise: 'Subir: {e} de probabilidad de ganar y {fe} de que se retiren la convierten en la mejor línea.',
       b1_call: 'Igualar: {e} de probabilidad de ganar supera el {req} necesario.', b1_check: 'Pasar: {e} de probabilidad de ganar realiza el bote gratis.',
       b1_fold: 'Retirarse: {e} de probabilidad de ganar está por debajo del {req} necesario.',
@@ -1024,7 +1021,6 @@ const PokerEngine = (function () {
 
   // ----------------------------------------------------------- narration
   // Conversational coach text built from live data. Text only: no decision logic here.
-  const STYLE_ES = { tight: 'cerrado', loose: 'suelto', aggressive: 'agresivo', passive: 'pasivo', balanced: 'neutro' };
   // [singular, plural] verb phrases for one player or several.
   const ACT_ES = {
     open: ['ha abierto', 'han abierto'], '3bet': ['ha resubido', 'han resubido'], call: ['solo ha igualado', 'solo han igualado'],
@@ -1039,7 +1035,6 @@ const PokerEngine = (function () {
   const TIER_ADJ_ES = { 1: 'muy fuerte', 2: 'fuerte', 3: 'jugable', 4: 'especulativa', 5: 'débil' };
   const TIER_ADJ_EN = { 1: 'very strong', 2: 'strong', 3: 'playable', 4: 'speculative', 5: 'weak' };
   const ES_INF = { fold: 'retirarte', call: 'igualar', check: 'pasar', raise: 'subir' };
-  const ES_STYLE_PL = { tight: 'ajustados', loose: 'sueltos', aggressive: 'agresivos', passive: 'pasivos', balanced: 'equilibrados' };
   const EN_GER = { fold: 'folding', call: 'calling', check: 'checking', raise: 'raising' };
   const EN_VERB = { fold: 'fold', call: 'call', check: 'check', raise: 'raise' };
   const ES_NUM = ['cero', 'un', 'dos', 'tres', 'cuatro'];
@@ -1063,31 +1058,24 @@ const PokerEngine = (function () {
     return byKind[v.lastActionKind] || 'pending';
   }
 
-  // One group of players with the same style and action.
+  // One group of players with the same action.
   function groupText(g, es) {
-    const k = g.count;
-    if (es) {
-      const adj = STYLE_ES[g.style] || 'neutro';
-      if (g.act === 'pending') return k === 1 ? 'un jugador ' + adj + ' por actuar' : (k <= 4 ? ES_NUM[k] : String(k)) + ' jugadores ' + adj + 's por actuar';
-      const verb = ACT_ES[g.act] || ACT_ES.pending;
-      if (k === 1) return 'un jugador ' + adj + ' que ' + verb[0];
-      return (k <= 4 ? ES_NUM[k] : String(k)) + ' jugadores ' + adj + 's que ' + verb[1];
-    }
-    const adj = g.style;
-    if (g.act === 'pending') return k === 1 ? (/^[aeiou]/i.test(adj) ? 'an ' : 'a ') + adj + ' player yet to act' : (k <= 4 ? EN_NUM[k] : String(k)) + ' ' + adj + ' players yet to act';
-    const verb = ACT_EN[g.act] || ACT_EN.pending;
-    if (k === 1) return (/^[aeiou]/i.test(adj) ? 'an ' : 'a ') + adj + ' player who ' + verb[0];
-    return (k <= 4 ? EN_NUM[k] : String(k)) + ' ' + adj + ' players who ' + verb[1];
+    const k = g.count, some = k === 1;
+    const who = es ? (some ? 'un jugador' : (k <= 4 ? ES_NUM[k] : String(k)) + ' jugadores')
+      : (some ? 'a player' : (k <= 4 ? EN_NUM[k] : String(k)) + ' players');
+    if (g.act === 'pending') return who + (es ? ' por actuar' : ' yet to act');
+    const verb = (es ? ACT_ES : ACT_EN)[g.act] || (es ? ACT_ES : ACT_EN).pending;
+    return who + (es ? ' que ' : ' who ') + verb[some ? 0 : 1];
   }
-  // "un jugador pasivo que solo ha igualado y dos jugadores neutros que aún no actúan"
+  // "un jugador que solo ha igualado y dos jugadores más"
   function villainPhrase(villains, L) {
     const es = L === 'es';
     const n = villains.length;
     if (!n) return es ? 'nadie más' : 'nobody else';
     const groups = [];
     for (const v of villains) {
-      let g = groups.find((x) => x.style === v.style && x.act === v.act);
-      if (!g) { g = { style: v.style, act: v.act, count: 0 }; groups.push(g); }
+      let g = groups.find((x) => x.act === v.act);
+      if (!g) { g = { act: v.act, count: 0 }; groups.push(g); }
       g.count++;
     }
     const pendingAll = villains.every((v) => v.act === 'pending');
@@ -1340,14 +1328,10 @@ const PokerEngine = (function () {
   function narrate(c) {
     const L = c.L, es = L === 'es', h = c.seed;
     const pick3 = (arr) => arr[h % arr.length];
-    const villains = c.villains.map((v) => ({ style: v.style, act: villainAct(v, c.preflop) }));
-    // Short opener: with several opponents, give the count; the stats table lists their styles.
-    // Several opponents: the count and the dominant style (the stats table lists each one).
-    const styleCount = {};
-    for (const v of c.villains) styleCount[v.style] = (styleCount[v.style] || 0) + 1;
-    const domStyle = Object.keys(styleCount).sort((a, b) => styleCount[b] - styleCount[a])[0];
+    const villains = c.villains.map((v) => ({ act: villainAct(v, c.preflop) }));
+    // Short opener: with several opponents, give the count; the stats table lists them.
     const vs = villains.length > 1
-      ? (es ? villains.length + ' jugadores, sobre todo ' + ES_STYLE_PL[domStyle] : villains.length + ' players, mostly ' + domStyle)
+      ? villains.length + (es ? ' jugadores' : ' players')
       : villainPhrase(villains, L);
     const posTxt = posName(c.pos, L);
     const streetTxt = c.preflop ? '' : (es ? ' en el ' + c.street : ' on the ' + c.street);
@@ -1575,7 +1559,6 @@ const PokerEngine = (function () {
     const villainText = vinfos.length
       ? vinfos.map((v, i) => tr(L, 'v_line', {
         pos: posName(live[i].position, L),
-        style: tr(L, 'style_' + v.style),
         role: tr(L, ROLE_KEY[v.role] || 'v_role_default'),
       })).join('; ')
       : tr(L, 'v_none');
@@ -1986,7 +1969,7 @@ const PokerEngine = (function () {
       seats.push({
         seat: i, position: pos, pos: pos, isHero: isHero,
         name: isHero ? tr(lang, 'name_hero') : tr(lang, 'name_seat', { n: i + 1 }),
-        style: isHero ? 'balanced' : pick(STYLES, rng), stack: stackFor(o, rng),
+        style: 'balanced', stack: stackFor(o, rng),
         bet: 0, contributed: 0, folded: false, allin: false, last: tr(lang, 'pending'), kind: 'pending', role: null,
         combo: 0,
       });
@@ -2155,7 +2138,6 @@ const PokerEngine = (function () {
     describeRange: describeRange,
     listChartSpots: listChartSpots,
     POSITIONS: TABLE_POS,
-    STYLES: STYLES,
     personalities: ['tight', 'loose', 'aggressive', 'passive', 'balanced'],
     randomWinPct: randomWinPct,
     standardRaiseTo: standardRaiseTo,

@@ -865,9 +865,8 @@ test('deterministic: the same situation gives the same result, whatever the scen
   }
 });
 
-test('explanations name the position, the opponents and their style; postflop notes show the board', () => {
-  const styleEn = /(tight|loose|aggressive|passive|balanced)/;
-  const styleEs = /(cerrad|suelt|agresiv|pasiv|neutr|equilibrad|ajustad)/;
+test('explanations name the position and the opponents, never a play style; postflop notes show the board', () => {
+  const style = /(tight|loose|aggressive|passive|balanced|cerrad|suelt|agresiv|pasiv|neutr|equilibrad|ajustad)/;
   let postflop = 0;
   for (let i = 0; i < 80; i++) {
     const lang = i % 2 ? 'es' : 'en';
@@ -876,7 +875,8 @@ test('explanations name the position, the opponents and their style; postflop no
     const posWord = E.i18n[lang]['pos_' + s.heroPosition];
     assert.ok(r.explanation[0].indexOf(posWord) >= 0, lang + ' position in bullet 1: ' + r.explanation[0]);
     if (r.stats.find((x) => x.key === 'villain') && s.seats.some((x) => !x.isHero && !x.folded)) {
-      assert.ok((lang === 'en' ? styleEn : styleEs).test(r.explanation[0]), lang + ' style in bullet 1: ' + r.explanation[0]);
+      assert.ok(/player|jugador/.test(r.explanation[0]), lang + ' opponents in bullet 1: ' + r.explanation[0]);
+      assert.ok(!style.test(r.explanation[0]), lang + ' style in bullet 1: ' + r.explanation[0]);
     }
     if (s.street !== 'preflop') {
       postflop++;

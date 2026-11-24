@@ -192,7 +192,6 @@
     if (/all-in/i.test(s)) out += ' · ' + t('la.allin');
     return out;
   }
-  function styleLabel(style) { return t('style.' + style); }
   function titleFor(sc) {
     var n = sc.numPlayers || sc.seats.length;
     var st = streetName(sc.street);
@@ -230,11 +229,11 @@
     var n = Math.round(Number(v));
     return isFinite(n) ? Math.max(lo, Math.min(hi, n)) : dflt;
   }
-  var PERSONALITY_TYPES = ['tight', 'loose', 'aggressive', 'passive', 'balanced'];
+  var BOT_LEVELS = window.PokerLadder.LADDER.map(function (b) { return b.id; });
   var STACK_MODES = ['equal', 'varied', 'custom'];
   function sanitizePers(v) {
-    var a = Array.isArray(v) ? v.filter(function (x) { return PERSONALITY_TYPES.indexOf(x) >= 0; }) : [];
-    return a.length ? a : PERSONALITY_TYPES.slice();
+    var a = Array.isArray(v) ? v.filter(function (x) { return BOT_LEVELS.indexOf(x) >= 0; }) : [];
+    return a.length ? a : BOT_LEVELS.slice();
   }
   function sanitizeCustom(v) {
     var a = Array.isArray(v) ? v.map(Number).filter(function (x) { return isFinite(x) && x > 0; }) : [];
@@ -532,7 +531,7 @@
         // the pot pill's reserve: the compact level (tiny tables) reserves less room for it
         var ov = backsOverhang(seats);
         for (var w = maxW; w >= minW && !found; w -= 2) {
-          // the height is measured at this width (a narrower seat can wrap its personality tag)
+          // the height is measured at this width (a narrower seat can wrap its Elo line)
           var sh = 0;
           seats.forEach(function (s) { s.style.width = w + 'px'; sh = Math.max(sh, s.offsetHeight); });
           var rx = (W - w) / 2, ry = (H - sh) / 2 - ov; // top seat's box and its backs stay inside the table
@@ -687,7 +686,7 @@
         dealerBtn: idx === btnIdx,
         name: s.isHero ? heroLabel() : cpuName(s.name || ('Seat ' + s.seat)),
         stackText: settings.money && !s.busted && isFinite(Number(s.stack)) ? fmtBB(num(s.stack)) : null,
-        styleLabel: !s.isHero && s.style && settings.personalities ? styleLabel(s.style) : null,
+        bot: !s.isHero && game === 'hands',
         lastText: la,
         tipText: s.isHero ? '' : seatTip(s),
         delay: seatsAnim ? rel * 70 : null,
@@ -1886,7 +1885,10 @@
     return { bots: isFinite(b) ? Math.max(1, Math.min(8, b)) : 3, prog: !!v.prog };
   }
   function isTable() { return mode === 'table' && !!tableRun; }
+  // Downloads the networks of the bots. Until then (or offline) rule-based stand-ins play.
+  function loadNeural() { window.PokerNN.load().catch(function () {}); }
   function tableConfig() {
+    loadNeural();
     return { cpus: tableCfg.bots, stackBB: settings.stack, noWalkover: true, money: settings.money,
       personalities: settings.personalities, stacks: 'equal', customStacks: settings.customStacks };
   }
@@ -2072,6 +2074,7 @@
 
   /* ---------- hands: full hands vs CPUs ---------- */
   function handsConfig() {
+    loadNeural();
     return { cpus: 8, stackBB: settings.stack, noWalkover: true, money: settings.money,
       personalities: settings.personalities, stacks: settings.stacks, customStacks: settings.customStacks };
   }
@@ -3068,7 +3071,7 @@
   function renderPersChecks(box, enabled, onChange) {
     if (!box) return;
     box.textContent = '';
-    PERSONALITY_TYPES.forEach(function (p) {
+    BOT_LEVELS.forEach(function (p) {
       var lab = document.createElement('label');
       lab.className = 'check';
       var cb = document.createElement('input');
@@ -3076,7 +3079,7 @@
       cb.value = p;
       cb.checked = enabled.indexOf(p) >= 0;
       cb.addEventListener('change', function () {
-        var on = PERSONALITY_TYPES.filter(function (q) {
+        var on = BOT_LEVELS.filter(function (q) {
           var c = box.querySelector('input[value="' + q + '"]');
           return c && c.checked;
         });
@@ -3085,7 +3088,7 @@
       });
       lab.appendChild(cb);
       var sp = document.createElement('span');
-      sp.textContent = t('pers.' + p);
+      sp.textContent = 'Elo ' + window.PokerLadder.level(p).table;
       lab.appendChild(sp);
       box.appendChild(lab);
     });

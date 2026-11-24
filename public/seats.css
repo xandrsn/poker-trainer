@@ -120,22 +120,14 @@
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.14), 0 2px 5px rgb(0 0 0 / 0.45);
 }
 #table .seat-avatar.bot .sym { width: 19px; height: 19px; }
-#table .seat-avatar.bot.st-tight { --sc: #7fb2ea; background: radial-gradient(circle at 50% 30%, #2d4d70 0%, #142437 75%); }
-#table .seat-avatar.bot.st-loose { --sc: #6fd39a; background: radial-gradient(circle at 50% 30%, #2b5c44 0%, #14302a 75%); }
-#table .seat-avatar.bot.st-aggressive { --sc: #ff7a59; background: radial-gradient(circle at 50% 30%, #6a3328 0%, #33191a 75%); }
-#table .seat-avatar.bot.st-passive { --sc: #b59ae6; background: radial-gradient(circle at 50% 30%, #433566 0%, #22193a 75%); }
-#table .seat-avatar.bot.st-balanced { --sc: #e8c25a; background: radial-gradient(circle at 50% 30%, #6b5a26 0%, #332d16 75%); }
+#table .seat-avatar.bot { --sc: #e8c25a; background: radial-gradient(circle at 50% 30%, #6b5a26 0%, #332d16 75%); }
 #table.lvl-2 .seat-avatar.bot { width: 22px; height: 22px; margin-bottom: 2px; }
 #table.lvl-2 .seat-avatar.bot .sym { width: 14px; height: 14px; }
 
 /* multiplayer plates (mp.js uses these helpers): the same bot illustration as a round avatar */
 .mp-av.bot-style { display: inline-flex; align-items: center; justify-content: center; color: var(--sc, #c9ccd2); background: #1f2430; }
 .mp-av.bot-style .sym { width: 62%; height: 62%; }
-.mp-av.bot-style.st-tight { --sc: #7fb2ea; }
-.mp-av.bot-style.st-loose { --sc: #6fd39a; }
-.mp-av.bot-style.st-aggressive { --sc: #ff7a59; }
-.mp-av.bot-style.st-passive { --sc: #b59ae6; }
-.mp-av.bot-style.st-balanced { --sc: #e8c25a; }
+.mp-av.bot-style { --sc: #e8c25a; }
 
 /* CPU plate: nothing may clip the peeking pair (the global overflow-y:hidden rule made the seat clip it), more breathing room, bigger cards */
 #table .seat { overflow: visible; padding: var(--s2) var(--s3); }
@@ -194,3 +186,5 @@ body #table .seat.hero.to-act::after { inset: 0; }
   #table.lvl-3 .seat .seat-stack::after, #table.lvl-2 .seat .seat-stack::after { content: none; }
 }
 
+
+#table .seat-elo { color: var(--gold-text, var(--gold)); font-size: max(11px, 0.75em); font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }

@@ -1,0 +1,108 @@
+/* Ranked screen, account chip and dialogs (public/ranked.js), plus the ranked state of the multiplayer table.
+ * Shares the .mr-screen, .mr-head, .mr-row and buttons of mp-rooms.css. */
+.rk-num { font-variant-numeric: tabular-nums; }
+.is-won { color: var(--raise); }
+.is-lost { color: color-mix(in srgb, var(--fold) 55%, var(--text)); }
+
+/* account chip in the top bar */
+.rk-chip {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; max-width: min(46vw, 260px); padding: 0 16px;
+  border: 1px solid var(--hair-strong); border-radius: 999px; background: var(--fill-soft); font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: border-color var(--t-base) var(--ease), background-color var(--t-base) var(--ease);
+}
+.rk-chip:hover { border-color: var(--gold); background: var(--fill-hover); }
+.rk-chip b { color: var(--gold-text, var(--gold)); }
+.rk-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body:not([data-view="menu"]) .rk-chip { display: none; }
+
+/* screen */
+.rk-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 8px 0 max(24px, env(safe-area-inset-bottom)); }
+.rk-grid { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: 24px; align-items: start; max-width: 980px; margin: 0 auto; }
+.rk-play { display: flex; flex-direction: column; gap: 12px; padding: 20px; border: 1px solid var(--hair); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--elev-2); position: sticky; top: 0; }
+.rk-play .mr-confirm, .rk-play .mr-join, .rk-auth .mr-confirm { width: 100%; }
+.rk-me { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
+.rk-me span { font-weight: 600; }
+.rk-me small, .rk-note, .rk-who small { color: var(--muted); font-size: 14px; }
+.rk-big { font-family: var(--font-display); font-size: 48px; line-height: 1.1; font-weight: 600; color: var(--gold-text, var(--gold)); }
+.rk-lead { margin: 0; font-size: 16px; }
+.rk-note { margin: 0; text-wrap: pretty; }
+.rk-err { margin: 0; color: color-mix(in srgb, var(--fold) 45%, var(--text)); font-size: 14px; }
+.rk-err:empty { display: none; }
+.rk-link { min-height: 36px; padding: 0 4px; border: 0; background: none; color: var(--muted); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.rk-link:hover { color: var(--text); }
+.rk-wait { display: flex; align-items: center; gap: 10px; margin: 0; }
+.rk-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--gold); animation: rkPulse 1.4s ease-in-out infinite; }
+@keyframes rkPulse { 50% { opacity: 0.25; transform: scale(0.7); } }
+
+.rk-tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--hair); }
+.rk-tabs button { min-height: 44px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--muted); font-weight: 600; cursor: pointer; transition: color var(--t-base) var(--ease), border-color var(--t-base) var(--ease); }
+.rk-tabs button:hover { color: var(--text); }
+.rk-tabs button[aria-selected="true"] { color: var(--text); border-color: var(--gold); }
+.rk-panel { min-height: 200px; transition: opacity var(--t-base) var(--ease); }
+.rk-panel[aria-busy="true"] { opacity: 0.55; }
+.rk-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rk-row { display: flex; align-items: center; gap: 16px; padding: 10px 12px 10px 16px; border-radius: var(--r-md); }
+.rk-who { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.rk-row .rk-who { display: flex; flex-direction: column; }
+.rk-game { display: flex; align-items: center; gap: 12px; padding: 8px 4px; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.rk-game time { color: var(--muted); }
+.rk-game > b { min-width: 40px; text-align: right; }
+.rk-res { min-width: 60px; font-weight: 600; }
+.rk-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.rk-table th { color: var(--muted); font-weight: 500; }
+.rk-table th, .rk-table td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--hair); }
+.rk-table th:nth-child(2), .rk-table td:nth-child(2) { text-align: left; }
+.rk-table .rk-link { color: var(--text); text-decoration: none; }
+.rk-table .rk-link:hover { text-decoration: underline; }
+.rk-table .is-me td { background: rgb(var(--gold-rgb) / 0.1); }
+.rk-pname, .rk-h { margin: 0 0 12px; }
+.rk-h { margin-top: 24px; }
+.rk-stats { display: flex; flex-wrap: wrap; gap: 12px 32px; margin: 0 0 20px; }
+.rk-stats dt { color: var(--muted); font-size: 13px; }
+.rk-stats dd { margin: 0; font-size: 20px; font-weight: 600; }
+.rk-fig { margin: 0; }
+.rk-fig figcaption { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+.rk-chart { position: relative; }
+.rk-chart svg { display: block; touch-action: pan-y; }
+.rk-grid-l { stroke: var(--hair); }
+.rk-axis { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.rk-end { fill: var(--text); font-weight: 600; }
+.rk-line { fill: none; stroke: var(--gold); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.rk-pt { fill: var(--gold); stroke: var(--bg); stroke-width: 2; }
+.rk-cross { stroke: var(--hair-strong); }
+.rk-tip { position: absolute; top: -20px; padding: 4px 8px; border-radius: var(--r-sm); background: var(--surface-2); box-shadow: var(--elev-2); font-size: 13px; white-space: nowrap; pointer-events: none; }
+
+/* dialogs */
+.rk-dlg { width: min(380px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--hair); border-radius: var(--r-lg); background: var(--surface); color: var(--text); box-shadow: var(--elev-3); }
+.rk-dlg::backdrop { background: rgb(var(--shadow-rgb) / 0.6); }
+.rk-dlg[open] { animation: rkIn 200ms var(--ease); }
+@keyframes rkIn { from { opacity: 0; transform: translateY(8px); } }
+.rk-auth { display: flex; flex-direction: column; gap: 16px; padding: 24px; }
+.rk-auth h2 { margin: 0; font-size: 24px; }
+.rk-auth label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.rk-auth input { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--bg); font-size: 16px; }
+.rk-auth small { color: var(--muted); font-size: 13px; }
+.rk-code { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--bg); font-family: ui-monospace, monospace; font-size: 17px; text-align: center; user-select: all; }
+.rk-access { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.rk-result { text-align: center; }
+.rk-delta { display: flex; align-items: baseline; justify-content: center; gap: 12px; margin: 0; font-size: 20px; font-weight: 600; }
+
+/* "Leave the game?" at the solo tables */
+.leave-pop { position: fixed; inset: 0; z-index: 60; background: rgb(var(--shadow-rgb) / 0.6); }
+.leave-pop > div { width: calc(100% - 32px); max-width: 340px; margin: 22vh auto 0; padding: 20px; border: 1px solid var(--hair); border-radius: var(--r-lg); background: var(--surface); color: var(--text); box-shadow: var(--elev-3); }
+.leave-pop p { margin: 0 0 16px; color: var(--muted); }
+.leave-pop #leave-title { margin-bottom: 4px; color: var(--text); font-weight: 600; }
+.leave-acts { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* multiplayer table in a ranked match: no host controls, the lobby only says who we wait for */
+#mp-root.is-ranked .mp-admin-sec, #mp-root.is-ranked .mp-lobby-meta, #mp-root.is-ranked .mp-lobby > :not(.mp-lobby-head) { display: none !important; }
+.mp-elo { flex: none; color: var(--gold-text, var(--gold)); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 760px) {
+  .rk-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .rk-play { position: static; }
+  .rk-game time { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rk-dot, .rk-dlg[open] { animation: none; }
+}

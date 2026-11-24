@@ -299,13 +299,6 @@
 }
 .mp-seat .mp-stack { color: var(--text); font-size: 15px; font-weight: var(--fw-strong); }
 .mp-last { font-size: 13px; color: var(--muted); }
-.mp-style { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 0 6px; border-radius: 999px; font-size: 13px; background: var(--surface-2); color: var(--text); }
-.mp-style::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
-.mp-style.st-tight::before { background: var(--style-tight); }
-.mp-style.st-loose::before { background: var(--style-loose); }
-.mp-style.st-aggressive::before { background: var(--style-aggressive); }
-.mp-style.st-passive::before { background: var(--style-passive); }
-.mp-style.st-balanced::before { background: var(--style-balanced); }
 .mp-mini { display: flex; gap: 3px; margin-top: 2px; }
 .mp-tip {
   position: absolute; z-index: 5; pointer-events: none;
@@ -588,7 +581,7 @@
 /* detail levels set by layoutTable(): lv1 drops avatar, style tag and last action; lv2 drops mini
    cards and cuts names to 6 characters; lv3 drops position badges (name and stack remain) */
 .mp-table.lv1 .mp-seat { padding: 4px 5px; }
-.mp-table.lv1 .mp-av, .mp-table.lv1 .mp-style, .mp-table.lv1 .mp-last { display: none; }
+.mp-table.lv1 .mp-av, .mp-table.lv1 .mp-last { display: none; }
 .mp-table.lv2 .mp-mini { display: none; }
 .mp-table.lv2 .mp-name, .mp-table.lv3 .mp-name { max-width: 6ch; }
 .mp-table.lv3 .mp-seat { padding: 4px 5px; }
@@ -600,7 +593,7 @@
 /* lv4 (extra-compact, last resort): plates show only name and stack; text may drop to 11px here (the
    only level allowed below 12px); board cards 22px; F/C/R keep their 44px tap size (not changed here) */
 .mp-table.lv4 .mp-seat { padding: 3px 4px; gap: 1px; border-width: 1px; }
-.mp-table.lv4 .mp-av, .mp-table.lv4 .mp-style, .mp-table.lv4 .mp-last, .mp-table.lv4 .mp-mini,
+.mp-table.lv4 .mp-av, .mp-table.lv4 .mp-last, .mp-table.lv4 .mp-mini,
 .mp-table.lv4 .mp-seat-top, .mp-table.lv4 .mp-backs, .mp-table.lv4 .mp-shown-tag { display: none; }
 .mp-table.lv4 .mp-name, .mp-table.lv4 .mp-seat .mp-stack { font-size: 11px; line-height: 1.2; }
 .mp-table.lv4 .mp-name { max-width: 5ch; }

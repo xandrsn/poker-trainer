@@ -5,7 +5,7 @@
  * Join table: a table-name finder (live filter; Enter joins an exact match) and the live list of open tables.
  * Create table: one panel with every table setting (no bots: those are added in the host lobby) and Create table.
  * Joining hands the table code to mp.js (window.PokerMP.open).
- * Browser only: window.PokerRooms = { show(msg?), hide(), roomId(), clear(), intent(m) }.
+ * Browser only: window.PokerRooms = { show(msg?), hide(), roomId(), clear(), join(id, name?), intent(m) }.
  * Own socket on /ws while a panel that needs the list or the name check is open; the server pushes roomList
  * every 2 s. */
 (function () {
@@ -656,6 +656,11 @@
 
   window.PokerRooms = {
     show: show, hide: hide, roomId: roomId, clear: clear,
+    // Opens a table by its code (ranked.js). name: used when the player has not set one.
+    join: function (id, name) {
+      if (name && !window.PokerMP.getName()) window.PokerMP.setName(name);
+      join(id);
+    },
     intent: function (m) { pendingIntent = m === 'create' || m === 'join' ? m : null; },
   };
 })();

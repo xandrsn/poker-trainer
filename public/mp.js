@@ -22,8 +22,7 @@
   var RELAY_FRESH_MS = 1500;      // a relayed sender counts as live for this long after its last frame
   var AUDIO_RATE = 8000;          // relayed audio: 8 kHz mu-law, 100 ms chunks
   var AUDIO_CHUNK = 800;
-  var STYLES = ['tight', 'loose', 'aggressive', 'passive', 'balanced'];
-  var DEFAULT_SETTINGS = { stack: 100000, randomness: 15, personalities: true, stacks: 'default', blindUpMin: 0 };
+  var DEFAULT_SETTINGS = { stack: 100000, randomness: 15, stacks: 'default', blindUpMin: 0 };
   var SUIT_GLYPH = { s: '♠', h: '♥', d: '♦', c: '♣' };
   var SUIT_CLASS = { s: 's-s', h: 's-h', d: 's-d', c: 's-c' };
   // Position names by number of seats between BB and the button (index = count).
@@ -704,7 +703,6 @@
     LINK_TIMEOUT_MS: LINK_TIMEOUT_MS,
     TURN_MS: TURN_MS,
     STUN_URL: STUN_URL,
-    STYLES: STYLES,
     DEFAULT_SETTINGS: DEFAULT_SETTINGS,
     AVATAR_MAX_BYTES: AVATAR_MAX_BYTES,
     formatChips: formatChips,
@@ -936,7 +934,6 @@
       'mp.spec.off': 'Off',
       'mp.blindUpMin': '{n} min',
       'mp.randomness': 'Randomness',
-      'mp.personalities': 'Bot personalities',
       'mp.botShowCards': 'Bots show their cards at showdown',
       'mp.out': 'You are out - spectating',
       'mp.role.player': 'Player',
@@ -950,7 +947,8 @@
       'mp.settingsInvalid': 'The starting stack must be from 5 to 1000 BB, in steps of 0.5 BB.',
       'mp.bots': 'Bots',
       'mp.addBot': 'Add bot',
-      'mp.botStyle': 'Personality',
+      'mp.botStyle': 'Bot Elo',
+      'mp.botMix': 'Mixed',
       'mp.botName': 'Name (optional)',
       'mp.editBot': 'Edit bot',
       'mp.saveBot': 'Save bot',
@@ -966,16 +964,6 @@
       'mp.lobby.counts': '{p} players · {b} bots', 'mp.lobby.botsCount': '{n} bots', 'mp.lobby.tableSettings': 'Table settings',
       'mp.lobby.editSettings': 'Edit settings', 'mp.lobby.doneSettings': 'Done', 'mp.lobby.needTwo': 'Add at least one more player or bot',
       'mp.lobby.startGame': 'Start game',
-      'mp.style.tight': 'Tight',
-      'mp.style.loose': 'Loose',
-      'mp.style.aggressive': 'Aggressive',
-      'mp.style.passive': 'Passive',
-      'mp.style.balanced': 'Balanced',
-      'mp.blurb.tight': 'Plays few hands and folds a lot.',
-      'mp.blurb.loose': 'Plays many hands, even weak ones.',
-      'mp.blurb.aggressive': 'Bets and raises often, and bluffs.',
-      'mp.blurb.passive': 'Calls more than it bets or raises.',
-      'mp.blurb.balanced': 'Mixes its play, neither tight nor loose.',
       'mp.tip.stack': 'Stack {amt} · {rank} of {n} · {rel}',
       'mp.tip.above': '{pct}% above average',
       'mp.tip.below': '{pct}% below average',
@@ -1119,7 +1107,6 @@
       'mp.spec.off': 'Desactivado',
       'mp.blindUpMin': '{n} min',
       'mp.randomness': 'Aleatoriedad',
-      'mp.personalities': 'Personalidades de bots',
       'mp.botShowCards': 'Los bots muestran sus cartas en el showdown',
       'mp.out': 'Te quedaste sin fichas - espectador',
       'mp.role.player': 'Jugador',
@@ -1133,7 +1120,8 @@
       'mp.settingsInvalid': 'El stack inicial debe estar entre 5 y 1000 BB, en pasos de 0,5 BB.',
       'mp.bots': 'Bots',
       'mp.addBot': 'Añadir bot',
-      'mp.botStyle': 'Personalidad',
+      'mp.botStyle': 'Elo del bot',
+      'mp.botMix': 'Variado',
       'mp.botName': 'Nombre (opcional)',
       'mp.editBot': 'Editar bot',
       'mp.saveBot': 'Guardar bot',
@@ -1149,16 +1137,6 @@
       'mp.lobby.counts': '{p} jugadores · {b} bots', 'mp.lobby.botsCount': '{n} bots', 'mp.lobby.tableSettings': 'Ajustes de la mesa',
       'mp.lobby.editSettings': 'Editar ajustes', 'mp.lobby.doneSettings': 'Listo', 'mp.lobby.needTwo': 'Añade al menos otro jugador o un bot',
       'mp.lobby.startGame': 'Empezar partida',
-      'mp.style.tight': 'Tight',
-      'mp.style.loose': 'Loose',
-      'mp.style.aggressive': 'Agresivo',
-      'mp.style.passive': 'Pasivo',
-      'mp.style.balanced': 'Equilibrado',
-      'mp.blurb.tight': 'Juega pocas manos y se retira mucho.',
-      'mp.blurb.loose': 'Juega muchas manos, incluso flojas.',
-      'mp.blurb.aggressive': 'Apuesta y sube a menudo, y farolea.',
-      'mp.blurb.passive': 'Iguala más de lo que apuesta o sube.',
-      'mp.blurb.balanced': 'Mezcla su juego, ni tight ni loose.',
       'mp.tip.stack': 'Stack {amt} · {rank} de {n} · {rel}',
       'mp.tip.above': '{pct}% por encima de la media',
       'mp.tip.below': '{pct}% por debajo de la media',
@@ -1281,7 +1259,8 @@
     });
   }
 
-  function styleLabel(style) { return tr('mp.style.' + style); }
+  // The Elo after a name: "(1163)".
+  function eloTag(p) { return p.rating != null ? '<span class="mp-elo">(' + esc(p.rating) + ')</span>' : ''; }
 
   function actLabel(a) {
     var k = String(a || '').toLowerCase();
@@ -1305,13 +1284,12 @@
     if (src) return '<img class="mp-av ' + cls + '" src="' + esc(src) + '" alt="">';
     return '<span class="mp-av ' + cls + ' init" aria-hidden="true">' + esc(core.initials(name)) + '</span>';
   }
-  // A bot's avatar: the style illustration when it has no photo; either way the style gloss bubble
+  // A bot's avatar: the network symbol when it has no photo; either way its gloss bubble
   // (SeatCard.bindGloss) opens on hover, focus or tap. Humans keep avHtml.
   function botAvHtml(p, cls) {
-    var style = String(p.style || 'balanced');
     var inner = p.avatar ? avHtml(p.avatar, p.name, cls)
-      : (window.SeatCard ? SeatCard.styleAvatarHtml(style) : avHtml('', p.name, cls));
-    return '<span class="gloss-av" data-gloss="style" data-gkey="' + esc(style) + '" tabindex="0">' + inner + '</span>';
+      : (window.SeatCard ? SeatCard.styleAvatarHtml() : avHtml('', p.name, cls));
+    return '<span class="gloss-av" data-gloss="style" data-gkey="neural" tabindex="0">' + inner + '</span>';
   }
   function avFor(p, cls) { return p.bot ? botAvHtml(p, cls) : avHtml(p.avatar, p.name, cls); }
   // Last action as a symbol; the hover/focus bubble carries the words (data-gname).
@@ -1380,9 +1358,14 @@
     C.avatar = u.avatar;
     if (E.name) E.name.value = C.name;
   }
+  function isRanked() { return !!(C.state.settings && C.state.settings.ranked); }
+  function rankedTable() { return isRanked() && C.state.settings.kind === 'table'; }
+  function rk(key) { return window.I18N ? window.I18N.t('rk.' + key) : key; }
   function savePrefs() {
+    // A ranked seat belongs to the account: its identity is never kept as this browser's own.
+    var own = isRanked();
     C.store = {
-      clientId: C.clientId, token: C.token || '',
+      clientId: own ? C.store.clientId : C.clientId, token: (own ? C.store.token : C.token) || '',
       camPref: !!C.camPref, micPref: !!C.micPref, compat: !!C.compat
     };
     saveStored();
@@ -1578,6 +1561,8 @@
       C.clientId = ''; C.token = ''; savePrefs(); sendJoin();
       return;
     }
+    if (msg.t === 'rated') { onRated(msg); return; }
+    if (C.ratedOpen && msg.t === 'error') return;
     if (msg.t === 'error' && /^room (not found|full)$/.test(String(msg.msg || ''))) { leave(); if (window.PokerRooms) { window.PokerRooms.clear(); window.PokerRooms.show(/full/.test(msg.msg) ? 'rooms.full' : 'rooms.gone'); } return; }
     if (msg.t === 'error' && /already paused|not paused/i.test(String(msg.msg || ''))) return;
     if (msg.t === 'welcome' && C.lastAct) C.resendAfterWelcome = true;
@@ -1594,7 +1579,7 @@
     if (msg.t === 'welcome' && msg.you && msg.you.clientId) {
       C.clientId = msg.you.clientId;
       C.token = msg.you.token || '';
-      savePrefs();
+      if (!(msg.settings && msg.settings.ranked)) savePrefs();
     }
     if (msg.t === 'welcome') emojiOnWelcome();
     var s = C.state;
@@ -2577,7 +2562,6 @@
     C.sig.settings = sig;
     var st = s.settings;
     if (document.activeElement !== E.setStack) E.setStack.value = core.fmtBB(st.stack, st.bb, true);
-    E.setPers.checked = !!st.personalities;
     E.setBShow.checked = !!st.botShowCards;
     E.setStacks.value = st.stacks === 'custom' ? 'custom' : 'default';
     if (document.activeElement !== E.setBlindUp) E.setBlindUp.value = String(st.blindUpMin || 0);
@@ -2607,7 +2591,7 @@
           '" data-seat="' + esc(p.seat) + '">' + esc(tr(p.bot ? 'mp.remove' : 'mp.kick')) + '</button>';
       }
       var tag = p.bot
-        ? '<span class="mp-style st-' + esc(p.style) + '">' + esc(styleLabel(p.style)) + '</span>'
+        ? eloTag(p)
         : svgIcon('cam', cam) + svgIcon('mic', mic);
       var av = p.bot ? botAvHtml(p, 'sm') : avHtml(p.avatar || (me ? C.avatar : ''), p.name, 'sm');
       return '<li class="mp-prow"><i class="mp-dot ' + (online ? 'on' : 'off') + '"></i>' + av +
@@ -2677,7 +2661,7 @@
     setHtml(E.stacksList, 'stacks', stackRows);
     var bots = s.players.filter(function (p) { return p.bot; }).map(function (p) {
       return '<li class="mp-prow">' + botAvHtml(p, 'sm') +'<span class="mp-pname">' + esc(p.name) + '</span>' +
-        '<span class="mp-style st-' + esc(p.style) + '">' + esc(styleLabel(p.style)) + '</span>' +
+        eloTag(p) +
         '<button type="button" class="mp-btn small" data-act="edit-bot" data-seat="' + esc(p.seat) + '">' +
         esc(tr('mp.edit')) + '</button></li>';
     }).join('');
@@ -2687,7 +2671,7 @@
     C.botPage = Math.min(Math.max(0, C.botPage || 0), pages - 1);
     var slice = botRows.slice(C.botPage * per, C.botPage * per + per).map(function (p) {
       return '<li class="mp-prow">' + botAvHtml(p, 'sm') +'<span class="mp-pname">' + esc(p.name) + '</span>' +
-        '<span class="mp-style st-' + esc(p.style) + '">' + esc(styleLabel(p.style)) + '</span>' +
+        eloTag(p) +
         '<button type="button" class="mp-btn small" data-act="edit-bot" data-seat="' + esc(p.seat) + '">' +
         esc(tr('mp.edit')) + '</button></li>';
     }).join('');
@@ -2956,10 +2940,10 @@
           (label ? '<span class="mp-pos' + (label === 'BTN' ? ' btn' : '') + '">' + esc(label) + '</span>' : '') +
           (x.seat === h.dealer ? '<span class="mp-dealer" title="' + esc(tr('mp.dealer')) + '">D</span>' : '') +
         '</div>' +
-        '<div class="mp-seat-who">' + (x.bot ? botAvHtml({ bot: true, style: x.style, avatar: seatAvatar(s, x.seat), name: x.name }, 'sm')
+        '<div class="mp-seat-who">' + (x.bot ? botAvHtml({ avatar: seatAvatar(s, x.seat), name: x.name }, 'sm')
           : avHtml(seatAvatar(s, x.seat), x.seat === me ? tr('mp.you') : x.name, 'sm')) +
-          '<span class="mp-name">' + esc(x.seat === me ? tr('mp.you') : x.name) + '</span></div>' +
-        (x.bot && x.style ? '<span class="mp-style st-' + esc(x.style) + '">' + esc(styleLabel(x.style)) + '</span>' : '') +
+          '<span class="mp-name">' + esc(x.seat === me ? tr('mp.you') : x.name) + '</span>' +
+          eloTag(x) + '</div>' +
         '<span class="mp-stack">' + bbTxt(x.stack) + '</span>' +
         (x.lastAction ? actSymHtml(x.lastAction) : '') +
         (x.seat === me ? '' : miniCards(x, reveal[x.seat])) +
@@ -3043,8 +3027,7 @@
     var info = core.rankInfo(s.hand.seats.map(function (v) { return v.stack; }), x.stack);
     var rel = info.pct === 0 ? tr('mp.tip.avg')
       : info.pct > 0 ? tr('mp.tip.above', { pct: info.pct }) : tr('mp.tip.below', { pct: -info.pct });
-    E.tip.innerHTML = '<strong>' + esc(x.name) + '</strong> · ' + esc(styleLabel(x.style)) +
-      '<span class="mp-tip-blurb">' + esc(tr('mp.blurb.' + x.style)) + '</span>' +
+    E.tip.innerHTML = '<strong>' + esc(x.name) + '</strong> ' + eloTag(x) +
       '<span class="mp-tip-stack">' + esc(tr('mp.tip.stack', { amt: bbTxt(x.stack), rank: info.rank, n: info.of, rel: rel })) + '</span>';
     E.tip.style.left = seatEl.style.left;
     E.tip.style.top = seatEl.style.top;
@@ -3264,6 +3247,8 @@
     }
     renderConn();
     renderProfilePreview();
+    E.root.classList.toggle('is-ranked', isRanked());
+    E.lobby.querySelector('.mp-lobby-title').textContent = isRanked() ? rk(rankedTable() ? 'waitTable' : 'waitOpp') : tr('mp.title');
     if (s.gameOverId && s.gameOverId !== C.seenGameOver) {
       C.seenGameOver = s.gameOverId;
       renderStandings();
@@ -3322,12 +3307,12 @@
     E.root.querySelectorAll('[data-mp-ph]').forEach(function (el) {
       el.setAttribute('placeholder', tr(el.getAttribute('data-mp-ph')));
     });
-    var styleOptions = STYLES.map(function (st) {
-      return '<option value="' + st + '">' + esc(tr('mp.style.' + st)) + '</option>';
+    var levels = window.PokerLadder.LADDER.map(function (b) {
+      return '<option value="' + b.id + '">' + b.table + '</option>';
     }).join('');
     [E.botStyle, E.beStyle, E.admStyle].forEach(function (sel) {
-      var cur = sel.value || 'balanced';
-      sel.innerHTML = styleOptions;
+      var cur = sel.value;
+      sel.innerHTML = (sel === E.beStyle ? '' : '<option value="">' + esc(tr('mp.botMix')) + '</option>') + levels;
       sel.value = cur;
     });
     E.setStacks.innerHTML = '<option value="default">' + esc(tr('mp.stacksDefault')) + '</option>' +
@@ -3440,7 +3425,6 @@
       spectatorCards: E.setSpec ? E.setSpec.value : 'live',
       lateStack: E.setLate ? E.setLate.value : 'start',
       lateFixedBB: E.setLateBB && Number.isFinite(Number(E.setLateBB.value)) ? Math.min(STACK_MAX_BB, Math.max(STACK_MIN_BB, Math.round(Number(E.setLateBB.value) * 2) / 2)) : undefined,
-      personalities: !!E.setPers.checked,
       botShowCards: !!E.setBShow.checked,
       // 'default' is a label only: keep the server's equal/varied mode, and send 'custom' only when chosen
       stacks: E.setStacks.value === 'custom' ? 'custom' : (C.state.settings && C.state.settings.stacks === 'varied' ? 'varied' : 'equal')
@@ -3458,7 +3442,8 @@
   }
 
   function addBot(style, name) {
-    var msg = { t: 'addBot', style: style || 'balanced' };
+    var msg = { t: 'addBot' }; // no style: the server picks a random Elo
+    if (style) msg.style = style;
     var nm = core.cleanName(name);
     if (nm) msg.name = nm;
     send(msg);
@@ -3467,9 +3452,9 @@
   function openBotEdit(seat) {
     var p = C.state.players.filter(function (q) { return q.bot && q.seat === seat; })[0];
     if (!p) return;
-    C.botEdit = { seat: seat, name: p.name, style: p.style || 'balanced', avatar: p.avatar || '' };
+    C.botEdit = { seat: seat, name: p.name, avatar: p.avatar || '' };
     E.beName.value = p.name;
-    E.beStyle.value = p.style || 'balanced';
+    E.beStyle.value = p.style;
     renderBotEdit();
   }
 
@@ -3680,7 +3665,7 @@
         if (u && !/^https?:\/\//.test(u)) { E.setErr.textContent = tr('mp.ext.bad'); E.setErr.classList.remove('hidden'); break; }
         send({
           t: 'settings', stack: C.state.settings.stack, blindUpMin: C.state.settings.blindUpMin || 0,
-          personalities: C.state.settings.personalities, stacks: C.state.settings.stacks, externalCallUrl: u
+          stacks: C.state.settings.stacks, externalCallUrl: u
         });
         break;
       }
@@ -4579,12 +4564,18 @@
   function askLeave() {
     var tv = E.tableView;
     var inTable = !!tv && tv.offsetParent !== null;
-    // Lobby (no table view): back leaves the room and returns to the Multiplayer screen, as leave does.
-    if (!inTable) {
-      if (window.PokerRooms) { leave(); window.PokerRooms.clear(); window.PokerRooms.show(); }
-      else handleAct('home', null);
-      return;
+    var ranked = isRanked();
+    function go() {
+      if (ranked && send({ t: 'resign' })) return; // the server answers with the result (onRated)
+      leave();
+      if (tv) tv.classList.add('hidden');
+      if (!window.PokerRooms) { handleAct('home', null); return; }
+      window.PokerRooms.clear();
+      if (ranked && window.PokerRanked) window.PokerRanked.show();
+      else window.PokerRooms.show();
     }
+    // Lobby (no table view): back leaves the room and returns to the Multiplayer screen, as leave does.
+    if (!inTable) { go(); return; }
     if (document.getElementById('mp-leave')) return;
     var es = lang() === 'es';
     var pop = document.createElement('div');
@@ -4594,11 +4585,11 @@
     pop.setAttribute('aria-modal', 'true');
     pop.setAttribute('aria-labelledby', 'mp-leave-t');
     pop.innerHTML = '<div class="mp-leave-card">' +
-      '<p id="mp-leave-t" class="mp-leave-t">' + (es ? '¿Salir de la partida?' : 'Leave the game?') + '</p>' +
-      '<p class="mp-leave-s">' + (es ? 'Te vas de la mesa y de la partida.' : 'You will leave the table and the game.') + '</p>' +
+      '<p id="mp-leave-t" class="mp-leave-t">' + (ranked ? rk('resignT') : es ? '¿Salir de la partida?' : 'Leave the game?') + '</p>' +
+      '<p class="mp-leave-s">' + (ranked ? rk(rankedTable() ? 'resignTable' : 'resignD') : es ? 'Te vas de la mesa y de la partida.' : 'You will leave the table and the game.') + '</p>' +
       '<div class="mp-leave-acts">' +
       '<button type="button" class="mp-btn" data-leave="stay">' + (es ? 'Quedarme' : 'Stay') + '</button>' +
-      '<button type="button" class="mp-btn mp-leave-go" data-leave="go">' + (es ? 'Salir' : 'Leave') + '</button>' +
+      '<button type="button" class="mp-btn mp-leave-go" data-leave="go">' + (ranked ? rk('resign') : es ? 'Salir' : 'Leave') + '</button>' +
       '</div></div>';
     function close() {
       document.removeEventListener('keydown', onKey, true);
@@ -4612,7 +4603,7 @@
       if (ev.target === pop) { close(); return; }
       if (!t) return;
       close();
-      if (t.getAttribute('data-leave') === 'go') { leave(); if (E.tableView) E.tableView.classList.add('hidden'); if (window.PokerRooms) { window.PokerRooms.clear(); window.PokerRooms.show(); } else handleAct('home', null); }
+      if (t.getAttribute('data-leave') === 'go') go();
     });
     document.addEventListener('keydown', onKey, true);
     document.body.appendChild(pop);
@@ -4636,6 +4627,20 @@
     setStatus('offline');
     C.sig.cams = null;
     render();
+    if (isRanked()) { C.clientId = C.store.clientId || ''; C.token = C.store.token || ''; }
+  }
+
+  // A ranked match ended: the result over the table, then back to the ranked screen.
+  function onRated(msg) {
+    if (C.ratedOpen || !window.PokerRanked) return;
+    C.ratedOpen = true;
+    markSession(false);
+    window.PokerRanked.result(msg, function () {
+      C.ratedOpen = false;
+      leave();
+      E.tableView.classList.add('hidden');
+      if (window.PokerRooms) window.PokerRooms.clear();
+    });
   }
 
   // Reloading mid-game: sessionStorage remembers that the player was in Multiplayer. Leave, back and End game clear it.
@@ -4666,7 +4671,10 @@
       E.root.hidden = false;
       E.root.classList.add('mp-standalone');
     }
-    if (window.PokerRooms && !window.PokerRooms.roomId()) { window.PokerRooms.show(); return; } if (C.name && !C.wantConnected) connect();
+    if (window.PokerRooms && !window.PokerRooms.roomId()) { window.PokerRooms.show(); return; } if (C.name && !C.wantConnected) {
+      C.state = Object.assign(core.initialState(), { gameOverId: C.state.gameOverId }); // nothing left over from the last table
+      connect();
+    }
     render();
   }
 
@@ -4727,7 +4735,6 @@
     E.pauseBanner = $('mp-pause-banner');
     E.pauseText = $('mp-pause-text');
     E.pauseResume = $('mp-pause-resume');
-    E.setPers = $('mp-set-pers');
     E.setBShow = $('mp-set-bshow');
     E.setErr = $('mp-set-err');
     E.stacksList = $('mp-stacks');
@@ -4817,8 +4824,6 @@
     }
     C.lang = lang();
     applyStatic();
-    E.botStyle.value = 'balanced';
-    E.admStyle.value = 'balanced';
 
     E.form.addEventListener('submit', onJoinSubmit);
     E.chatForm.addEventListener('submit', onChatSubmit);
@@ -4877,7 +4882,6 @@
     loadRtcConfig();
     setInterval(relayStale, 1000);
     E.setStack.addEventListener('change', sendSettings);
-    E.setPers.addEventListener('change', sendSettings);
     E.setBShow.addEventListener('change', sendSettings);
     E.setStacks.addEventListener('change', sendSettings);
     E.setBlindUp.addEventListener('change', sendSettings);
@@ -5076,8 +5080,6 @@
               <label class="mp-field"><span data-mp-i18n="mp.spectatorCards"></span><select id="mp-set-spec"></select></label>
               <label class="mp-field"><span data-mp-i18n="mp.lateStack"></span><select id="mp-set-late"></select></label>
               <label class="mp-field" id="mp-set-late-wrap" hidden><span data-mp-i18n="mp.lateFixed"></span><input id="mp-set-late-bb" type="number" min="5" step="0.5" value="20"></label>
-              <label class="mp-check"><input id="mp-set-pers" type="checkbox" checked>
-                <span data-mp-i18n="mp.personalities"></span></label>
               <label class="mp-check"><input id="mp-set-bshow" type="checkbox">
                 <span data-mp-i18n="mp.botShowCards"></span></label>
               <label class="mp-field"><span data-mp-i18n="mp.stacksMode"></span><select id="mp-set-stacks"></select></label>
@@ -5171,7 +5173,7 @@
         <button type="button" class="mp-btn" id="mp-double" data-act="double-blinds" data-mp-i18n="mp.doubleBlinds"></button>
         <button type="button" class="mp-btn" data-act="reset" data-mp-i18n="mp.resetStacks"></button>
         <button type="button" class="mp-btn danger" data-act="end" data-mp-i18n="mp.endGame"></button>
-        <div class="mp-row"><select id="mp-adm-style" aria-label="Personality"></select>
+        <div class="mp-row"><select id="mp-adm-style" aria-label="Elo"></select>
           <button type="button" class="mp-btn" data-act="admin-add-bot" data-mp-i18n="mp.addBot"></button></div>
         <p class="mp-note hidden" id="mp-paused" data-mp-i18n="mp.paused"></p>
       </div>

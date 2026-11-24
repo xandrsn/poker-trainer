@@ -11,14 +11,13 @@ A raise may be any amount from the legal minimum up to all-in.
 ## Money and settings
 `settings` (host; most keys between hands, see Refusals):
 - `stack` (100..1e9) equal starting stack. `sb`, `bb` (sb <= bb, stack >= bb). Setting `sb`/`bb` makes them the new **base** blinds.
-- `personalities`: array of enabled CPU types from `tight|loose|aggressive|passive|balanced` (at least one; `true` = all, `false` = `['balanced']`). A bot whose type is disabled plays as balanced.
 - `stacks`: `'equal'` (everyone gets `stack`), `'varied'` (each seat gets a random 0.4x-1.6x of `stack`, whole big blinds; redrawn at join, reset and rebuy) or `'custom'` (per-seat starting stacks set with `setStack`/`setStacks`). Switching to equal or varied puts every seat on the new stacks at once.
 - `externalCallUrl`: `https://...` or `http://...` (<= 200 chars) or `null`/`''` to clear. Allowed mid-hand.
 - `botShowCards`: `true|false` (default `false`). Controls whether PLAYERS see bot cards at showdown. Spectators are not affected (see Spectators). Allowed mid-hand.
 - `blindUpMin`: integer 0..10 (default 0 = off). Minutes between automatic blind doublings (see Blinds). Allowed mid-hand.
 - `spectatorCards`: `'live'` (default), `'afterHand'` or `'off'` (see Spectators). Allowed mid-hand.
 - `lateStack`: `'start'` (default, the starting stack), `'half'` (half the starting stack), `'avg'` (average of the other stacks) or `'fixed'`. Applies to a player who joins while a game runs (see Rooms). `lateFixedBB`: number >= 5 in steps of 0.5 (default 20), used by `'fixed'`. Amounts are rounded to whole half big blinds. Allowed mid-hand.
-- `randomness` is retired: accepted and ignored so old clients keep working.
+- `randomness` and `personalities` are retired: accepted and ignored so old clients keep working.
 - Server-added read-only fields in every settings object sent out: `blindLevel` (int, 0 = base blinds, count of doublings in effect) and `nextBlindUpAt` (epoch ms of the next progressive doubling, or `null` when off, paused or idle).
 
 ## Rooms
@@ -36,12 +35,19 @@ Many tables run side by side on one server. Each room has its own state, seats, 
 - The client sends `joinRoom` (with the room code) right after the socket opens, then `join` as before. A direct `join` without a room goes to a hidden default room (legacy, used by tests).
 - **Late join**: a player who joins while a game runs is seated at once but `waiting: true` in `lobby.players` until the next deal: `hand.seats` has no cards for them and they play from the next hand. Their entry stack follows `settings.lateStack`: `start` (starting stack), `half` (half the starting stack), `avg` (average of the other seats' stacks, rounded to the nearest half BB) or `fixed` (`lateFixedBB` BB). The new chips are a buy-in, counted in the ledger (`netChips`).
 
+## Ranked matches
+A ranked match is a room with `settings.ranked` and `settings.kind`: `duel` (two seats) or `table` (six, some may be bots), 50 BB, blinds double every 2 minutes, no host controls. The seats belong to the session cookie's account; nobody else can join, and the room is not listed.
+- `{t:'resign'}` (client -> server) loses the match; at a table the player takes the lowest place still open and the others play on. Refused elsewhere with 'not a ranked match'.
+- `{t:'rated', kind, void, reason, winner, place, of, players:[...]}` (server -> client) ends the match for that player: `winner` is a name or null, `place` of `of` is their result, `players` holds the accounts rated so far with rating before and after, `delta` and `place`. A void match changes nothing. At a table, a player who has not arrived after 45 s is dropped unrated.
+- A player who stays away too long loses; an opponent who never arrives (45 s) voids the match.
+- `lobby.players` entries carry `rating`.
+
 ## Client -> server
 - `{t:'join', name, clientId?, token?, avatar?, highlight?}` name 1-16 chars. `clientId` (public: peers see it, kept in localStorage) and `token` (secret, from the `welcome` of that seat, kept in localStorage) reclaim the seat after a refresh. **A clientId alone never reclaims a seat**: a wrong or missing `token` gets `'this seat belongs to another player'`. A valid reclaim while the seat is connected elsewhere takes it over and closes the old socket. A seat that was abandoned (below) is gone: the same clientId then joins as a new player with a new seat and a fresh stack.
 - `{t:'profile', name?, avatar?, highlight?}` your name, avatar and highlight colour (any time once seated).
   - `avatar`: `null` to clear, or a data URL `data:image/jpeg|png|webp;base64,...` of at most **64 KB decoded** (exact: 65536 bytes accepted, 65537 refused, the size is the base64 length times 3/4 minus the `=` padding). Anything else is refused.
   - `highlight`: `#rrggbb` (lowercased by the server) or `null`.
-- `{t:'addBot', style, name?, avatar?}` host; style `tight|loose|aggressive|passive|balanced`.
+- `{t:'addBot', style?, name?, avatar?}` host; style is an Elo level, `lv1` (weakest) to `lv6`, see `public/ladder.js`; omitted = a random level. Any other value: 'unknown style'. Without a name the bot gets a free one of its level.
 - `{t:'editBot', seat, name?, avatar?, style?}` host. Name and avatar any time; `style` only between hands.
 - `{t:'removeBot', seat}` host, between hands.
 - `{t:'kick', seat}` host. Between hands the seat is freed at once. Mid-hand the player is removed from `lobby.players` and `state` at once and their socket is closed; they fold on their turn (at once if it is their turn now). Chips already in the pot stay there and are awarded normally. The seat is held until the hand ends, then freed. A second kick of that seat is refused ('that player is already leaving'), and the old clientId cannot rejoin meanwhile ('you were removed from this table').
@@ -66,7 +72,7 @@ Many tables run side by side on one server. Each room has its own state, seats, 
 ### Refusals (error text in `{t:'error', msg}`)
 While the game is **paused** the server refuses, with 'the game is paused': `act`, `start`, `settings` (all keys), `reset`, `rebuy`, `addBot`, `removeBot`, `kick`, `setStack(s)`, `doubleBlinds`. Still allowed while paused: `chat`, `resume` (any host), `endGame`, `profile`, `emojiSet`, `emojiGet`, `ping`, `rtc`, `needKey`, `showHand`, `diag`.
 
-Mid-hand refusals (wait until the hand ends): `reset`, `setStack(s)`, `removeBot`, `start`, `editBot` style, and `settings` for `stack`, `sb`, `bb`, `personalities`, `stacks`.
+Mid-hand refusals (wait until the hand ends): `reset`, `setStack(s)`, `removeBot`, `start`, `editBot` style, and `settings` for `stack`, `sb`, `bb`, `stacks`.
 
 Out seats (spectators): `act` and `showHand` are refused ('you are out - spectating'). `rebuy` brings them back in, and the host's `reset` puts every seat back on its starting stack.
 
@@ -80,7 +86,7 @@ The host is the earliest joiner who is still connected. When the host drops (gra
 - `{t:'chatHistory', messages:[chat...]}` sent once after `welcome`: the last 50 chat messages.
 - `{t:'emojiPack', clientId, emojis}` every non-empty custom emoji pack, once per pack to a joiner, and to all seated connections whenever a pack changes.
 - `{t:'lobby', name, players:[...], spectators:[...], settings}` sent on every change. `name` is the table name (the room name from create, cleaned, max 24 chars; `null` if unset). `welcome` carries the same `name` at the top level, next to `you` and `settings`. The lobby title and the code chip show it; guests pick the table by this name in the list.
-  - Each player: `{seat, clientId? (humans), name, avatar:string|null, highlight:string|null, bot, style? (bots), stack, startStack, connected, host, camera:false}`. `stack` is the current stack, `startStack` the seat's starting stack. `connected` turns false only after the 5 s grace.
+  - Each player: `{seat, clientId? (humans), name, avatar:string|null, highlight:string|null, bot, style? (bots), rating? (bots, and everyone in ranked: the Elo), stack, startStack, connected, host, camera:false}`. `stack` is the current stack, `startStack` the seat's starting stack. `connected` turns false only after the 5 s grace.
   - Each spectator (busted human, see below): `{seat, clientId, name, avatar, connected, stack}`. `stack` is the chips they still hold (under 1 BB; they count in `netChips` until a rebuy). `players` never contains spectators.
   - `settings` is the current settings object (see Money and settings, including `blindLevel` and `nextBlindUpAt`).
 - `{t:'state', paused:null | {by, name, since, autoResumeAt}, serverNow, hand:null | {...}}` sent to every seated client on every change.
@@ -92,7 +98,7 @@ The host is the earliest joiner who is still connected. When the host drops (gra
     - `pots` (only when over): `[{amount, winners:[seat,...]}]`, the pots paid in the hand, for money animations.
     - `turnLeftMs`: ms left on the current turn clock (frozen while paused, null if no clock). `nextLeftMs`: ms to the next deal between hands (null when none). Clients draw countdowns from these, never from guesses about `Date.now()`.
     - `showWindowMs`: the between-hands window (5000 by default). `nextHandAt`: epoch ms of the next deal, or null while paused or when none is scheduled.
-    - `seats`: `[{seat, name, avatar, highlight, bot, style?, stack, bet, inHand, folded, allIn, position, lastAction, cards, shown, revealed, connected}]`. Out seats are not listed.
+    - `seats`: `[{seat, name, avatar, highlight, bot, style?, rating?, stack, bet, inHand, folded, allIn, position, lastAction, cards, shown, revealed, connected}]`. Out seats are not listed.
       - `cards` is `[c,c]` when you are allowed to see them, otherwise `null` (see Card visibility).
       - `shown`: this seat chose to show between hands (showHand). `revealed`: the cards are face-up for everybody (showdown or shown, bots only when `botShowCards`).
       - `shownTo: 'observers'` (only while a hand runs): this seat showed mid-hand. Present only in the state of the shower and of observers (folded, not dealt in, or spectators); the cards come with it in `cards`. Absent for every other viewer, so active players get no cards, no marker and no hint.
@@ -167,6 +173,12 @@ Cards are strings like `"As"`.
 - Clients reconnect with backoff and +-30% jitter, and also on window 'online' and 'pageshow'.
 
 ## HTTP endpoints (same origin as the page, also on HTTPS)
+- `/api` (JSON, no-store; errors are `{error}` with the status code; 503 when nothing can be saved):
+  - `GET me` `{user, google}` (`google`: Google sign-in is set up), `GET bots`, `GET leaderboard`, `GET profile?name=`.
+  - `POST register` and `POST login` `{name, password}`, `POST logout`. They set or clear an HttpOnly cookie. `register` also replies with `code`, the recovery code.
+  - `POST recover` `{name, code, password}`: sets a new password, ends other sessions, replies `{user, code}` with the next code. `POST recovery-code` `{password}` (signed in): a new code.
+  - `POST google` `{link?}` replies `{url}` of Google's page (`link`: connect to the signed-in account). `GET google/callback` redirects to `/?google=ok|linked|taken|name|error`; after `name`, `POST google/finish` `{name}` creates the account.
+  - `POST queue` `{bot?, mode?}`: poll for a duel, start one against a bot, or with `mode:'table'` poll for a table. Replies `{status:'matched', room}` or `{status:'waiting', waited, players?}`. `POST queue/cancel` leaves the queue.
 - `GET /lan-info` (no-store): `{urls:['https://<lan-ip>:<HTTPS_PORT>', ...], https:boolean}`; `https` is true when the server also listens on HTTPS.
 
 ## Media

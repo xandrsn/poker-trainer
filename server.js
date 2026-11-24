@@ -5,6 +5,10 @@ const os = require('os');
 const path = require('path');
 const { attachMultiplayer } = require('./server/mp.js');
 const { RoomManager } = require('./server/rooms.js');
+const { createStore, redisUrl } = require('./server/store.js');
+const { Accounts } = require('./server/accounts.js');
+const { createApi } = require('./server/api.js');
+const { Cluster } = require('./server/cluster.js');
 
 const PORT = process.env.PORT || 3000;
 const HTTPS_PORT = Number(process.env.HTTPS_PORT) || 3443;
@@ -60,11 +64,12 @@ function sendJson(res, obj) {
 }
 
 // Request handler shared by the HTTP and HTTPS servers.
-// opts: { httpsActive, httpsPort } (for /lan-info).
+// opts: { httpsActive, httpsPort } (for /lan-info), { api } (accounts and ranked play).
 function createHandler(opts) {
   const o = opts || {};
   return (req, res) => {
     const pathOnly = req.url.split('?')[0];
+    if (o.api && pathOnly.startsWith('/api/')) return o.api(req, res, pathOnly.slice(5));
     if (pathOnly === '/rtc-config') return sendJson(res, rtcConfig(process.env));
     if (pathOnly === '/lan-info') {
       const port = o.httpsPort || HTTPS_PORT;
@@ -73,10 +78,11 @@ function createHandler(opts) {
         https: !!o.httpsActive,
       });
     }
-    let urlPath = decodeURIComponent(pathOnly);
+    let urlPath;
+    try { urlPath = decodeURIComponent(pathOnly); } catch (e) { res.writeHead(400).end('Bad request'); return; }
     if (urlPath === '/') urlPath = '/index.html';
     const file = path.normalize(path.join(ROOT, urlPath));
-    if (!file.startsWith(ROOT)) {
+    if (!file.startsWith(ROOT + path.sep)) {
       res.writeHead(403).end('Forbidden');
       return;
     }
@@ -95,10 +101,19 @@ function createHandler(opts) {
 }
 
 // Static files from public/, /rtc-config, /lan-info, and the multiplayer table on WebSocket /ws.
-// opts (optional, for tests): { seed, timing, diagFile, httpsActive, httpsPort }.
+// opts (optional): { seed, timing, diagFile, httpsActive, httpsPort, storeFile (accounts without Redis) }.
+// Accounts and room sharing use Redis when REDIS_URL is set. On Vercel without it there are no accounts
+// (its memory and disk do not last), and rooms live in one function instance only.
 function createServer(opts) {
-  const server = http.createServer(createHandler(opts));
-  server.multiplayer = attachMultiplayer(server, opts);
+  const o = Object.assign({}, opts);
+  const store = redisUrl() || !process.env.VERCEL ? createStore({ file: o.storeFile }) : null;
+  const accounts = store && new Accounts(store);
+  const manager = new RoomManager(o);
+  if (store && store.kind === 'redis') new Cluster(manager, store);
+  o.api = createApi(store, accounts, manager);
+  const server = http.createServer(createHandler(o));
+  server.api = o.api;
+  server.multiplayer = attachMultiplayer(server, Object.assign({}, o, { manager, accounts }));
   return server;
 }
 
@@ -115,7 +130,8 @@ module.exports = { createServer, createHttpsServer, rtcConfig, lanAddresses, loa
 if (require.main === module) {
   const creds = loadCerts();
   const handlerOpts = { httpsActive: !!creds, httpsPort: HTTPS_PORT };
-  const httpServer = createServer(handlerOpts);
+  const httpServer = createServer(Object.assign({ storeFile: path.join(__dirname, 'data', 'store.json') }, handlerOpts));
+  handlerOpts.api = httpServer.api;
   httpServer.listen(PORT, () => console.log(`Poker Trainer running at http://localhost:${PORT}`));
   if (creds) {
     const httpsServer = createHttpsServer(httpServer.multiplayer.manager, creds, handlerOpts);

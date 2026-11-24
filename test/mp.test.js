@@ -1,6 +1,7 @@
 'use strict';
 // Multiplayer server tests: real ws clients against createServer() on an ephemeral port.
 const assert = require('assert');
+const Ladder = require('../public/ladder.js');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -147,7 +148,7 @@ test('join, lobby, host flags, peers, rtc relay, bad input', async () => {
     assert.strictEqual(b.welcome.you.seat, 1);
     assert.strictEqual(b.welcome.you.host, false);
     assert.deepStrictEqual(a.welcome.settings,
-      { stack: 100000, sb: 500, bb: 1000, personalities: ['tight', 'loose', 'aggressive', 'passive', 'balanced'], stacks: 'equal', externalCallUrl: null, botShowCards: false, blindUpMin: 0, spectatorCards: 'live', lateStack: 'start', lateFixedBB: 20, blindLevel: 0, nextBlindUpAt: null });
+      { stack: 100000, sb: 500, bb: 1000, stacks: 'equal', externalCallUrl: null, botShowCards: false, blindUpMin: 0, spectatorCards: 'live', lateStack: 'start', lateFixedBB: 20, blindLevel: 0, nextBlindUpAt: null });
     await until(() => a.lobby && a.lobby.players.length === 2, 3000, 'lobby with 2');
     assert.strictEqual(a.lobby.players[0].host, true);
     assert.strictEqual(a.lobby.players[1].host, false);
@@ -155,11 +156,13 @@ test('join, lobby, host flags, peers, rtc relay, bad input', async () => {
     await until(() => a.peers && a.peers.ids.length === 2, 3000, 'peers');
     assert.deepStrictEqual(a.peers.ids.sort(), ['ann-client-0001', 'ben-client-0002']);
 
-    a.send({ t: 'addBot', style: 'tight' });
+    a.send({ t: 'addBot', style: 'lv1' });
     await until(() => a.lobby.players.length === 3, 3000, 'bot in lobby');
     const bot = a.lobby.players[2];
     assert.strictEqual(bot.bot, true);
-    assert.strictEqual(bot.style, 'tight');
+    assert.strictEqual(bot.style, 'lv1');
+    assert.strictEqual(bot.rating, Ladder.level('lv1').table);
+    assert.ok(Ladder.level('lv1').names.includes(bot.name), bot.name);
     assert.strictEqual(bot.seat, 2);
 
     a.send({ t: 'rtc', to: 'ben-client-0002', data: { sdp: 'offer-x' } });
@@ -189,9 +192,9 @@ test('host-only rules and settings validation', async () => {
   try {
     const a = await connect(t.port, 'Ann', 'ann-client-0011');
     const b = await connect(t.port, 'Ben', 'ben-client-0012');
-    a.send({ t: 'addBot', style: 'aggressive' });
+    a.send({ t: 'addBot', style: 'lv3' });
     await until(() => a.lobby && a.lobby.players.length === 3, 3000);
-    b.send({ t: 'addBot', style: 'tight' });
+    b.send({ t: 'addBot', style: 'lv1' });
     b.send({ t: 'start' });
     b.send({ t: 'settings', stack: 5000 });
     b.send({ t: 'kick', seat: 0 });
@@ -231,7 +234,7 @@ test('kick, removeBot and table-full rules between hands', async () => {
   try {
     const a = await connect(t.port, 'Ann', 'ann-client-0021');
     const b = await connect(t.port, 'Ben', 'ben-client-0022');
-    a.send({ t: 'addBot', style: 'loose' });
+    a.send({ t: 'addBot', style: 'lv2' });
     await until(() => a.lobby && a.lobby.players.length === 3, 3000);
     a.send({ t: 'removeBot', seat: 2 });
     await until(() => a.lobby.players.length === 2, 3000, 'bot removed');
@@ -353,8 +356,8 @@ test('3 humans + 2 bots play 20 hands: chips conserved, hidden cards hidden, sho
     const a = await connect(t.port, 'Ann', 'ann-client-0061');
     const b = await connect(t.port, 'Ben', 'ben-client-0062');
     const c = await connect(t.port, 'Cy', 'cy-client-0063');
-    a.send({ t: 'addBot', style: 'tight' });
-    a.send({ t: 'addBot', style: 'aggressive' });
+    a.send({ t: 'addBot', style: 'lv1' });
+    a.send({ t: 'addBot', style: 'lv3' });
     await until(() => a.lobby && a.lobby.players.length === 5, 3000, 'five seats');
 
     const obs = { hands: new Set(), reveals: 0, failures: [], expected: null, prevStacks: null, rawChecks: 0, seen: {} };
@@ -459,12 +462,22 @@ test('fresh room has no default bot; one human + bots play 30 hands without stal
     await until(() => a.lobby, 3000, 'lobby');
     assert.strictEqual(a.lobby.players.length, 1, 'a fresh room has only the human');
     assert.strictEqual(a.lobby.players.filter((p) => p.bot).length, 0);
-    a.send({ t: 'addBot', style: 'tight' });
-    a.send({ t: 'addBot', style: 'aggressive' });
+    a.send({ t: 'addBot', style: 'lv1' });
+    a.send({ t: 'addBot', style: 'lv3' });
     await until(() => a.lobby.players.length === 3, 3000, 'two bots');
     attachDriver(a, rng); // the human plays and rebuys when busted
     const hands = new Set(), botHands = new Set();
+    let stopped = false;
     a.listeners.push((m) => {
+      // One player won all the chips (the bots shove now and then): fill the empty seats and play another game.
+      // The lobby sent right after gameOver is the first one without the busted bots, hence the wait for the state.
+      if (m.t === 'gameOver') stopped = true;
+      else if (stopped && m.t === 'state') {
+        stopped = false;
+        if (a.lobby.spectators.some((s) => s.stack > 0)) a.send({ t: 'rebuy' }); // the driver covers a stack of 0
+        for (let n = a.lobby.players.length; n < 3; n++) a.send({ t: 'addBot' });
+        a.send({ t: 'start' });
+      }
       if (m.t !== 'state' || !m.hand) return;
       if (m.hand.over) hands.add(m.hand.id);
       if (m.hand.seats.some((s) => s.bot && s.lastAction)) botHands.add(m.hand.id);
@@ -500,7 +513,7 @@ test('avatars: join, profile and editBot carry them; bad images are rejected', a
     b.send({ t: 'profile', avatar: 'data:image/gif;base64,R0lGOD' });
     await until(() => b.errors.length === 3, 3000);
 
-    a.send({ t: 'addBot', style: 'loose', name: 'Robo' });
+    a.send({ t: 'addBot', style: 'lv2', name: 'Robo' });
     await until(() => a.lobby.players.length === 3, 3000);
     a.send({ t: 'editBot', seat: 2, avatar: PNG });
     await until(() => a.lobby.players[2].avatar === PNG, 3000, 'bot avatar');
@@ -520,19 +533,19 @@ test('editBot: host only; name and avatar any time, style only between hands', a
   try {
     const a = await connect(t.port, 'Ann', 'ann-client-0091');
     const b = await connect(t.port, 'Ben', 'ben-client-0092');
-    a.send({ t: 'addBot', style: 'balanced' });
+    a.send({ t: 'addBot', style: 'lv5' });
     await until(() => a.lobby && a.lobby.players.length === 3, 3000);
     b.send({ t: 'editBot', seat: 2, name: 'Nope' });
     await until(() => b.errors.includes('host only'), 3000);
     a.send({ t: 'editBot', seat: 0, name: 'Nope' });
-    a.send({ t: 'editBot', seat: 2, name: 'Robo', style: 'loose', avatar: PNG });
+    a.send({ t: 'editBot', seat: 2, name: 'Robo', style: 'lv2', avatar: PNG });
     await until(() => a.lobby.players[2].name === 'Robo', 3000);
-    assert.strictEqual(a.lobby.players[2].style, 'loose');
+    assert.strictEqual(a.lobby.players[2].style, 'lv2');
     a.send({ t: 'start' });
     await until(() => a.state && a.state.hand, 3000);
     a.send({ t: 'editBot', seat: 2, name: 'Robo2', avatar: null });
     await until(() => a.lobby.players[2].name === 'Robo2', 3000, 'name mid-hand');
-    a.send({ t: 'editBot', seat: 2, style: 'tight' });
+    a.send({ t: 'editBot', seat: 2, style: 'lv1' });
     await until(() => a.errors.length === 2, 3000);
     assert.deepStrictEqual(a.errors, ['no bot at that seat', 'wait until the hand ends']);
     a.close(); b.close();
@@ -569,7 +582,7 @@ test('pause freezes turn timers and bot actions; actions are refused; resume con
   try {
     const a = await connect(t.port, 'Ann', 'ann-client-0111');
     const b = await connect(t.port, 'Ben', 'ben-client-0112');
-    a.send({ t: 'addBot', style: 'passive' });
+    a.send({ t: 'addBot', style: 'lv4' });
     await until(() => a.lobby && a.lobby.players.length === 3, 3000);
     a.send({ t: 'start' });
     await until(() => a.state && a.state.hand, 3000);
@@ -600,7 +613,7 @@ test('custom stacks: unequal stacks, short stacks cannot over-raise, chips conse
     const a = await connect(t.port, 'Ann', 'ann-client-0121');
     const b = await connect(t.port, 'Ben', 'ben-client-0122');
     const c = await connect(t.port, 'Cy', 'cy-client-0123');
-    a.send({ t: 'addBot', style: 'tight' });
+    a.send({ t: 'addBot', style: 'lv1' });
     await until(() => a.lobby && a.lobby.players.length === 4, 3000);
     a.send({ t: 'setStack', seat: 0, stack: 4000 });
     await until(() => a.errors.length === 1, 3000);
@@ -778,7 +791,7 @@ test('starting stacks and late fixed stack: 5 to 1000 BB in half-BB steps', asyn
   }
 });
 
-test('settings: externalCallUrl, personalities list, varied stacks', async () => {
+test('settings: externalCallUrl, retired personalities, varied stacks', async () => {
   const t = await start({ timing: SLOW });
   try {
     const a = await connect(t.port, 'Ann', 'ann-client-0161');
@@ -789,12 +802,11 @@ test('settings: externalCallUrl, personalities list, varied stacks', async () =>
     assert.strictEqual(a.errors[0], 'externalCallUrl must be an http(s) URL');
     a.send({ t: 'settings', externalCallUrl: 'https://meet.example.com/room' });
     await until(() => a.lobby.settings.externalCallUrl === 'https://meet.example.com/room', 3000, 'call url');
-    a.send({ t: 'settings', personalities: ['tight', 'nope'] });
+    a.send({ t: 'settings', personalities: ['tight'] }); // an old client: ignored
+    a.send({ t: 'addBot', style: 'tight' });
     await until(() => a.errors.length === 2, 3000);
-    assert.strictEqual(a.errors[1], 'unknown personality nope');
-    a.send({ t: 'settings', personalities: ['tight', 'aggressive'] });
-    await until(() => a.lobby.settings.personalities.length === 2, 3000, 'personalities');
-    assert.deepStrictEqual(a.lobby.settings.personalities, ['tight', 'aggressive']);
+    assert.strictEqual(a.errors[1], 'unknown style');
+    assert.strictEqual(a.lobby.settings.personalities, undefined);
     a.send({ t: 'settings', stacks: 'bogus' });
     await until(() => a.errors.length === 3, 3000);
     a.send({ t: 'settings', stacks: 'varied' });
@@ -1018,7 +1030,7 @@ test('busted human leaves the seats; a spectator cannot act; positions re-adjust
   try {
     const a = await connect(t.port, 'Ann', 'ann-client-0401');
     const b = await connect(t.port, 'Ben', 'ben-client-0402');
-    a.send({ t: 'addBot', style: 'balanced' });
+    a.send({ t: 'addBot', style: 'lv5' });
     await until(() => a.lobby && a.lobby.players.length === 3, 3000);
     t.room._setStack(1, 0);
     a.send({ t: 'start' });
@@ -1040,7 +1052,7 @@ test('bot hole cards stay hidden by default; botShowCards shows them at showdown
   const t = await start({ timing: SLOW });
   try {
     const a = await connect(t.port, 'Ann', 'ann-client-0411');
-    a.send({ t: 'addBot', style: 'balanced' });
+    a.send({ t: 'addBot', style: 'lv5' });
     await until(() => a.lobby && a.lobby.players.length === 2, 3000);
     a.send({ t: 'start' });
     await until(() => a.state && a.state.hand, 3000);
@@ -1065,7 +1077,7 @@ test('End game: every seat back to starting stacks, no hand dealt until the host
   try {
     const a = await connect(t.port, 'Ann', 'ann-client-0421');
     const b = await connect(t.port, 'Ben', 'ben-client-0422');
-    a.send({ t: 'addBot', style: 'tight' });
+    a.send({ t: 'addBot', style: 'lv1' });
     await until(() => a.lobby && a.lobby.players.length === 3, 3000);
     a.send({ t: 'start' });
     await until(() => a.state && a.state.hand, 3000);
@@ -1132,7 +1144,7 @@ test('pause: server banner, frozen turn clock equal for everyone, refusals, paus
     await until(() => a.errors.includes('the game is paused'), 2000, 'settings refused');
     a.send({ t: 'reset' });
     a.send({ t: 'doubleBlinds' });
-    a.send({ t: 'addBot', style: 'tight' });
+    a.send({ t: 'addBot', style: 'lv1' });
     await until(() => a.errors.filter((e) => e === 'the game is paused').length >= 4, 2000, 'refusals');
     assert.strictEqual(a.errors.filter((e) => e === 'the game is paused').length, 4, 'pausing twice is silent');
     const onClock = a.state.hand.toAct === b.seat;
@@ -1369,7 +1381,7 @@ test('spectators see every dealt seat, bots included (live); afterHand shows bot
     t.room._setStack(c.seat, 0);
     t.room._changed({});
     await until(() => a.lobby && a.lobby.spectators.length === 1, 2000, 'spectator listed');
-    a.send({ t: 'addBot', style: 'passive' });
+    a.send({ t: 'addBot', style: 'lv4' });
     await until(() => a.lobby && a.lobby.players.length === 3 && a.lobby.players.some((p) => p.bot), 2000, 'bot added');
     const botSeat = a.lobby.players.find((p) => p.bot).seat;
     a.send({ t: 'start' });
@@ -1722,7 +1734,7 @@ test('bots: a busted bot leaves its seat for good and never returns with chips; 
     const a = await connect(t.port, 'Ann', 'ann-client-0701');
     const b = await connect(t.port, 'Ben', 'ben-client-0702');
     attachDriver(a, rng); attachDriver(b, rng);
-    for (let i = 0; i < 4; i++) a.send({ t: 'addBot', style: ['tight', 'loose', 'aggressive', 'passive'][i] });
+    for (let i = 0; i < 4; i++) a.send({ t: 'addBot', style: ['lv1', 'lv2', 'lv3', 'lv4'][i] });
     await until(() => a.lobby && a.lobby.players.length === 6, 3000, 'four bots seated');
     a.send({ t: 'settings', stacks: 'custom' });
     await until(() => a.lobby.settings.stacks === 'custom', 3000);
@@ -1915,9 +1927,9 @@ test('last-action labels: every seat shows its last real action of the street, m
   };
   try {
     const a = await connect(t.port, 'Ann', 'ann-client-0311');
-    a.send({ t: 'addBot', style: 'tight' });
-    a.send({ t: 'addBot', style: 'aggressive' });
-    a.send({ t: 'addBot', style: 'balanced' });
+    a.send({ t: 'addBot', style: 'lv1' });
+    a.send({ t: 'addBot', style: 'lv3' });
+    a.send({ t: 'addBot', style: 'lv5' });
     await until(() => a.lobby && a.lobby.players.length === 4, 3000, 'four seats');
     attachDriver(a, rng);
     a.send({ t: 'start' });
@@ -1986,7 +1998,7 @@ test('removeBot mid-hand is accepted: no error, the bot leaves when the hand end
   try {
     const a = await connect(t.port, 'Ann', 'ann-client-0701');
     const b = await connect(t.port, 'Ben', 'ben-client-0702');
-    a.send({ t: 'addBot', style: 'tight' });
+    a.send({ t: 'addBot', style: 'lv1' });
     await until(() => a.state && a.lobby && a.lobby.players.some((p) => p.bot), 3000, 'bot added');
     const botSeat = a.lobby.players.find((p) => p.bot).seat;
     a.send({ t: 'start' });
@@ -2092,7 +2104,7 @@ test('elimination: a bot under 1 BB is removed at hand end with a botOut chat li
     const a = await connect(t.port, 'Ann', 'ann-client-0901');
     const b = await connect(t.port, 'Ben', 'ben-client-0902');
     attachDriver(a, rng); attachDriver(b, rng);
-    await seatTwoHumansAndBots(t, a, b, ['tight', 'loose'], 1000);
+    await seatTwoHumansAndBots(t, a, b, ['lv1', 'lv2'], 1000);
     const botSeats = [2, 3];
     const names = {};
     botSeats.forEach((s) => { names[s] = t.room.recs[s].name; });
@@ -2132,7 +2144,8 @@ test('elimination: a human under 1 BB becomes a spectator at hand end (not remov
     const a = await connect(t.port, 'Ann', 'ann-client-0911');
     const b = await connect(t.port, 'Ben', 'ben-client-0912');
     attachDriver(a, rng); attachDriver(b, rng);
-    await seatTwoHumansAndBots(t, a, b, ['tight'], 20000);
+    await seatTwoHumansAndBots(t, a, b, ['lv1', 'lv2'], 200000);
+    rawStacks(t, { 0: 200000 });         // deep, so the first hand leaves at least two players with chips
     t.room.timing.nextHandMs = 600000;
     await playHand(a, t);
     t.room._setStack(1, 500);            // Ben ends the hand under 1 BB (1000)
@@ -2161,7 +2174,7 @@ test('elimination: a seat all-in at 0 mid-hand is not eliminated and keeps its p
     const a = await connect(t.port, 'Ann', 'ann-client-0921');
     const b = await connect(t.port, 'Ben', 'ben-client-0922');
     attachDriver(a, rng); attachDriver(b, rng);
-    await seatTwoHumansAndBots(t, a, b, ['loose', 'aggressive'], 1000);
+    await seatTwoHumansAndBots(t, a, b, ['lv2', 'lv3'], 1000);
     t.room.timing.nextHandMs = 600000;
     const tracked = trackRemovedChips(t.room);
     const total0 = t.room.chipsInPlay();
@@ -2203,8 +2216,8 @@ test('soak: 300 hands, 3 humans on autoplay + 2 bots (seed 2026): no stall, no o
     const c = await connect(t.port, 'Cy', 'cy-client-0933');
     attachDriver(a, rng); attachDriver(b, rng); attachDriver(c, rng);
     await until(() => a.lobby && a.lobby.players.length === 3, 3000, 'three humans');
-    a.send({ t: 'addBot', style: 'tight' });
-    a.send({ t: 'addBot', style: 'aggressive' });
+    a.send({ t: 'addBot', style: 'lv1' });
+    a.send({ t: 'addBot', style: 'lv3' });
     await until(() => a.lobby.players.length === 5, 3000, 'two bots');
     const tracked = trackRemovedChips(t.room);
     const total0 = t.room.chipsInPlay();

@@ -1,1 +1,12 @@
-{ "outputDirectory": "public", "buildCommand": "", "installCommand": "", "framework": null }
+{
+  "framework": null,
+  "buildCommand": "",
+  "outputDirectory": "public",
+  "functions": { "api/server.mjs": { "maxDuration": 300, "includeFiles": "{server,public}/*.{js,json}" } },
+  "rewrites": [
+    { "source": "/ws", "destination": "/api/server" },
+    { "source": "/rtc-config", "destination": "/api/server" },
+    { "source": "/lan-info", "destination": "/api/server" },
+    { "source": "/api/:path*", "destination": "/api/server" }
+  ]
+}

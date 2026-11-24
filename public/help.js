@@ -12,7 +12,7 @@
       more: 'More details',
       sections: [
         { h: 'Do the opponents have real cards?', p: [
-          'Yes. Every hand is dealt from a real, shuffled deck of 52 cards. CPU players hold actual cards and play them according to their style. Hands stay hidden unless they reach showdown or a player shows them.'
+          'Yes. Every hand is dealt from a real, shuffled deck of 52 cards. CPU players hold actual cards and play them with a neural network. Hands stay hidden unless they reach showdown or a player shows them.'
         ] },
         { h: 'How is the win percentage calculated?', p: [
           'The app does not know the opponents\' cards, and neither do you. So it imagines thousands of possible deals of the unseen cards (the opponents\' cards and the rest of the board) and counts how often your hand wins. That share is your win percentage.',
@@ -28,7 +28,7 @@
         ] },
         { h: 'How the 0 to 100 score is given', p: [
           'Each decision is compared with the best move found for that exact spot. The best move scores 100. A close alternative scores high. A clear mistake scores low.',
-          'It is a scale, because several moves are often fine in poker. The text gives the reasons: your hand, the board, position, number of players and opponents\' styles.'
+          'It is a scale, because several moves are often fine in poker. The text gives the reasons: your hand, the board, position and number of players.'
         ] },
         { h: 'Position, players and stack depth', p: [
           'Position: acting later means you see what the others did first, which is an advantage.',
@@ -55,7 +55,7 @@
       more: 'Más detalles',
       sections: [
         { h: '¿Los rivales tienen cartas reales?', p: [
-          'Sí. Cada mano se reparte de una baraja real de 52 cartas, barajada. Los CPU tienen cartas de verdad y juegan según su estilo. Las manos quedan ocultas, salvo en el showdown o si un jugador las muestra.'
+          'Sí. Cada mano se reparte de una baraja real de 52 cartas, barajada. Los CPU tienen cartas de verdad y las juegan con una red neuronal. Las manos quedan ocultas, salvo en el showdown o si un jugador las muestra.'
         ] },
         { h: '¿Cómo se calcula el porcentaje de victoria?', p: [
           'La app no conoce las cartas de los rivales, y tú tampoco. Por eso imagina miles de repartos posibles de las cartas ocultas (las de los rivales y el resto del tablero) y cuenta cuántas veces gana tu mano. Esa proporción es tu porcentaje de victoria.',
@@ -71,7 +71,7 @@
         ] },
         { h: 'Cómo se da la puntuación de 0 a 100', p: [
           'Cada decisión se compara con la mejor jugada encontrada para esa situación exacta. La mejor jugada puntúa 100. Una alternativa parecida puntúa alto. Un error claro puntúa bajo.',
-          'Es una escala, porque en el póker varias jugadas suelen ser válidas. El texto explica los motivos: tu mano, el tablero, tu posición, el número de jugadores y el estilo de los rivales.'
+          'Es una escala, porque en el póker varias jugadas suelen ser válidas. El texto explica los motivos: tu mano, el tablero, tu posición y el número de jugadores.'
         ] },
         { h: 'Posición, jugadores y profundidad de fichas', p: [
           'Posición: actuar más tarde significa ver antes lo que hicieron los demás, y eso es una ventaja.',

@@ -26,6 +26,7 @@
   <link rel="stylesheet" href="mp-lobby-skin.css">
   <link rel="stylesheet" href="review-ui.css">
   <link rel="stylesheet" href="design.css">
+  <link rel="stylesheet" href="ranked.css">
 </head>
 <body data-view="menu">
 <noscript><p class="noscript-msg" style="padding:16px;text-align:center">Poker Trainer needs JavaScript to run. Please enable JavaScript and reload the page. / Poker Trainer necesita JavaScript. Actívalo y recarga la página.</p></noscript>
@@ -37,6 +38,7 @@
     
 
     <div class="top-right">
+      <button type="button" class="rk-chip" id="btn-account"></button>
       <button type="button" class="icon-btn settings-btn" id="btn-settings" data-i18n-aria="aria.settings" aria-label="Settings" aria-haspopup="dialog" aria-expanded="false" aria-controls="settings-panel"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></svg></button>
     </div>
   </header>
@@ -47,11 +49,11 @@
   </button>
 
   <!-- Back arrow during a live hand or game: a small confirmation (Esc = stay). Not a native dialog. -->
-  <div class="hidden" id="leave-pop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60">
-    <div role="alertdialog" aria-modal="true" aria-labelledby="leave-title" aria-describedby="leave-msg" tabindex="-1" style="margin:22vh auto 0;max-width:320px;width:calc(100% - 32px);padding:18px 20px;border-radius:12px;background:#1b1f24;color:#f4f4f4;box-shadow:0 10px 30px rgba(0,0,0,.4)">
-      <p id="leave-title" style="margin:0 0 6px;font-weight:600" data-i18n="leave.title">Leave the game?</p>
-      <p id="leave-msg" style="margin:0 0 14px;opacity:.85" data-i18n="leave.msg">Progress of the current hand is lost.</p>
-      <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="ghost" id="leave-stay" data-i18n="leave.stay">Stay</button><button type="button" class="big" id="leave-go" data-i18n="leave.go">Leave</button></div>
+  <div class="hidden leave-pop" id="leave-pop">
+    <div role="alertdialog" aria-modal="true" aria-labelledby="leave-title" aria-describedby="leave-msg" tabindex="-1">
+      <p id="leave-title" data-i18n="leave.title">Leave the game?</p>
+      <p id="leave-msg" data-i18n="leave.msg">Progress of the current hand is lost.</p>
+      <div class="leave-acts"><button type="button" class="ghost" id="leave-stay" data-i18n="leave.stay">Stay</button><button type="button" class="big" id="leave-go" data-i18n="leave.go">Leave</button></div>
     </div>
   </div>
 
@@ -113,6 +115,11 @@
           <span class="hm-desc" data-i18n="menu.hubPlayDesc">Against bots or with friends.</span>
         </button>
         <div class="hub-opts" id="hub-opts-play" role="group" aria-labelledby="hub-play">
+          <button type="button" class="mode-card" id="menu-card-ranked">
+            <span class="mc-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M7 3h10v2h3v3c0 2.5-1.7 4.4-4 4.9a5 5 0 0 1-3 3V18h4v3H7v-3h4v-2.1a5 5 0 0 1-3-3C5.7 12.4 4 10.5 4 8V5h3zm0 4H6v1c0 1 .4 1.8 1 2.4zm10 0v3.4c.6-.6 1-1.4 1-2.4V7z"/></svg></span>
+            <span class="mc-name" data-i18n="rk.title">Ranked</span>
+            <span class="mc-desc" data-i18n="rk.cardDesc">Heads-up matches for rating points, against players or trained bots.</span>
+          </button>
           <button type="button" class="mode-card" data-fmt="table">
             <span class="mc-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12zm0 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg></span>
             <span class="mc-name" data-i18n="menu.hubVsBots">Vs bots</span>
@@ -177,8 +184,9 @@
           </div>
         </div>
         <div class="menu-group">
-          <span class="menu-label" data-i18n="settings.personalities">CPU personalities</span>
+          <span class="menu-label" data-i18n="settings.botElo">Bot Elo</span>
           <div class="pers-list" id="menu-pers"></div>
+          <p class="hint" data-i18n="settings.botEloHint">Pick one for a table of that Elo, or several to mix them.</p>
           <label class="check"><input type="checkbox" id="menu-money"><span data-i18n="menu.money">Money (stacks)</span></label>
         </div>
 <div class="menu-group table-only"><span class="menu-label" data-i18n="menu.tableBots">Bots</span><div class="field-row"><label class="field"><span data-i18n="menu.tableBotsLabel">Bots</span><select id="menu-bots"></select></label><label class="field"><span data-i18n="menu.tableStack">Starting stack (BB)</span><input type="number" id="menu-stack" min="5" max="1000" step="0.5" value="100"></label></div><label class="check"><input type="checkbox" id="menu-prog"><span data-i18n="menu.tableProg">Progressive blinds (every 10 hands, doubling)</span></label></div>
@@ -191,7 +199,7 @@
           <label class="field" id="set-stack-field"><span data-i18n="settings.stack">Stack (BB)</span><input type="number" id="set-stack" min="5" max="1000" step="0.5" value="100" data-i18n-aria="aria.startStack" aria-label="Starting stack in big blinds"></label>
           <label class="field"><span data-i18n="settings.stacks">Stacks</span><select id="set-stacks"></select></label>
           <label class="field set-span hidden" id="set-custom-field"><span data-i18n="settings.customStacks">Custom stacks (BB, comma separated, you first)</span><input type="text" id="set-custom-stacks" data-i18n-aria="aria.customStacks" aria-label="Custom stacks in big blinds"></label>
-          <p class="hint set-span" data-i18n="settings.nextSession">Personalities and money apply from the next session.</p>
+          <p class="hint set-span" data-i18n="settings.nextSession">Bot Elo and money apply from the next session.</p>
         </div>
       </details>
       <button type="button" class="big btn-call sheet-start" id="menu-start"><span data-i18n="menu.play">Play</span></button>
@@ -420,9 +428,9 @@
     <p class="rule-ex" data-i18n="rules.stack.ex">Example: A♠ 5♠ is a shove at 10 BB.</p>
   </details>
   <details class="rule">
-    <summary data-i18n="rules.styles.title">Opponents’ styles</summary>
-    <p data-i18n="rules.styles.body">Tight players fold a lot.</p>
-    <p class="rule-ex" data-i18n="rules.styles.ex">Example: the same bet means more from a passive player.</p>
+    <summary data-i18n="rules.styles.title">The bots</summary>
+    <p data-i18n="rules.styles.body">Every bot is a neural network.</p>
+    <p class="rule-ex" data-i18n="rules.styles.ex">Example: a big river bet can be a bluff.</p>
   </details>
   <details class="rule">
     <summary data-i18n="rules.board.title">Your hand and the board</summary>
@@ -494,6 +502,8 @@
 <script src="engine.js"></script>
 <script src="i18n.js"></script>
 <script src="bots.js"></script>
+<script src="nn.js"></script>
+<script src="ladder.js"></script>
 <script src="game.js"></script>
 <script src="stats.js"></script>
 <script src="theme.js"></script>
@@ -511,5 +521,6 @@
 <script src="menu-hub.js"></script>
 <script src="mp.js"></script>
 <script src="mp-rooms.js"></script>
+<script src="ranked.js"></script>
 </body>
 </html>

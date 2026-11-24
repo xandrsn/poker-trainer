@@ -3,7 +3,6 @@
  *
  * window.Symbols
  *   svg(name)            -> SVG markup string for one icon (aria-hidden; the caller adds the label)
- *   styleIcon(style)     -> icon name for a play style: tight, loose, aggressive, passive, balanced
  *   actionIcon(raw)      -> { key, icon } for a raw last-action text ('check', 'raise to 50', 'all-in', ...)
  */
 (function (root) {
@@ -15,6 +14,7 @@
     flame: '<path d="M12 3c1 3.2 4.5 5.2 4.5 9.5a4.5 4.5 0 0 1-9 0c0-2 .9-3.4 2-4.5.1 1.7.7 2.8 1.7 3.4C11 8.5 11.3 5.8 12 3z"/>',
     pause: '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>',
     scales: '<path d="M12 4v16M7 20h10M4 7h16"/><path d="M4 7l-2.5 6h5z"/><path d="M20 7l-2.5 6h5z"/>',
+    nodes: '<circle cx="5" cy="7" r="2"/><circle cx="5" cy="17" r="2"/><circle cx="12.5" cy="12" r="2"/><circle cx="20" cy="12" r="2"/><path d="M6.7 8.1l4.1 2.8M6.7 15.9l4.1-2.8M14.5 12H18"/>',
     tick: '<path d="M5 12.5l4.5 4.5L19 7"/>',
     equals: '<path d="M5 9h14M5 15h14"/>',
     up: '<path d="M12 20V5M6 11l6-6 6 6"/>',
@@ -23,8 +23,6 @@
     bolt: '<path d="M13.5 2.5L5 13.5h6l-1.5 8 9-11.5h-6z" fill="currentColor"/>',
     out: '<circle cx="12" cy="12" r="8.5"/><path d="M6 18L18 6"/>'
   };
-
-  var STYLE_ICON = { tight: 'shield', loose: 'dice', aggressive: 'flame', passive: 'pause', balanced: 'scales' };
 
   // ordered: the first matching rule wins (all-in beats the verb: 'bet 20 all-in' is an all-in)
   var ACTION_RULES = [
@@ -43,9 +41,6 @@
     return '<svg class="sym sym-' + name + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
       'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + body + '</svg>';
   }
-  function styleIcon(style) {
-    return STYLE_ICON[style] || 'scales';
-  }
   function actionIcon(raw) {
     var s = String(raw || '');
     for (var i = 0; i < ACTION_RULES.length; i++) {
@@ -54,5 +49,5 @@
     return { key: 'other', icon: 'equals' };
   }
 
-  root.Symbols = { svg: svg, styleIcon: styleIcon, actionIcon: actionIcon };
+  root.Symbols = { svg: svg, actionIcon: actionIcon };
 })(window);

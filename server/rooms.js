@@ -69,8 +69,9 @@ class RoomManager {
   nameTaken(name, exceptId) {
     const key = roomKey(name);
     if (!key) return false;
+    if (this.cluster && this.cluster.cache.some((r) => r.id !== exceptId && roomKey(r.name) === key)) return true;
     for (const e of this.entries.values()) {
-      if (e.id !== exceptId && roomKey(e.name) === key) return true;
+      if (e.isPublic && e.id !== exceptId && roomKey(e.name) === key) return true;
     }
     return false;
   }
@@ -105,6 +106,30 @@ class RoomManager {
     return entry;
   }
 
+  // A room for one ranked match (hidden from the list). Returns its id.
+  async createRanked(ranked, settings) {
+    const id = this.newId();
+    const room = new Room(Object.assign({}, this.opts, { room: undefined, seed: undefined, ranked, rankedSettings: settings }));
+    room.roomId = id;
+    room.roomName = 'Ranked';
+    if (this.cluster) {
+      await this.cluster.createRanked(room, id);
+      room.dispose();
+      return id;
+    }
+    const entry = { id, name: room.roomName, room, createdAt: Date.now(), isPublic: false, password: null, emptySince: Date.now() };
+    room.roomEntry = entry;
+    this.entries.set(id, entry);
+    return id;
+  }
+
+  // 'live', 'stale' (no state change for staleMs) or 'gone'.
+  async status(id, staleMs) {
+    if (this.cluster) return this.cluster.status(id, staleMs);
+    const room = this.get(id);
+    return room && !room.finished ? 'live' : 'gone';
+  }
+
   // Room state for the list. players = seated humans, bots = seated bots, max = humans allowed.
   summary(entry) {
     const room = entry.room;
@@ -128,7 +153,7 @@ class RoomManager {
   }
 
   list() {
-    return Array.from(this.entries.values()).map((e) => this.summary(e));
+    return Array.from(this.entries.values()).filter((e) => e.isPublic).map((e) => this.summary(e));
   }
 
   // Attaches conn to a room (connection bookkeeping in Room.connect).
@@ -144,6 +169,7 @@ class RoomManager {
     if (!room) return;
     room.disconnect(conn);
     if (room.roomEntry && room.conns.size === 0) room.roomEntry.emptySince = Date.now();
+    if (this.cluster) this.cluster.leftBy(room);
   }
 
   // Destroys rooms with no connection for emptyMs. The default room is never destroyed.
@@ -159,11 +185,17 @@ class RoomManager {
     if (!e) return;
     this.entries.delete(id);
     e.room.dispose();
+    if (this.cluster) this.cluster.destroyed(id);
   }
 
   pushLists() {
     if (!this.subscribers.size) return;
-    const msg = { t: 'roomList', rooms: this.list() };
+    if (this.cluster) {
+      this.cluster.list().then((rooms) => this._push(rooms)).catch((e) => console.error('rooms: ' + e.message));
+    } else this._push(this.list());
+  }
+  _push(rooms) {
+    const msg = { t: 'roomList', rooms };
     for (const conn of this.subscribers) conn.send(msg);
   }
 
@@ -171,6 +203,7 @@ class RoomManager {
     clearInterval(this._sweeper);
     clearInterval(this._pusher);
     this.subscribers.clear();
+    if (this.cluster) this.cluster.close();
     for (const e of this.entries.values()) e.room.dispose();
     this.entries.clear();
     this.defaultRoom.dispose();

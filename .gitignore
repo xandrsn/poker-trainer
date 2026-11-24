@@ -3,7 +3,6 @@ certs/
 logs/
 *.pem
 GAMER/
-logs/
 public-url.txt
 *.stackdump
 e2e-*.json
@@ -12,3 +11,8 @@ rs_*.txt
 .e2e-shots/
 .claude/
 skill/
+
+data/
+ml/__pycache__/
+ml/*.log
+ml/*.backup.json

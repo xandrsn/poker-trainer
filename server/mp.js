@@ -14,6 +14,7 @@
  *   server -> others: [type u8][sender seat u8][payload]
  * Nothing is stored. Each client has a byte budget (RELAY_BYTES_PER_S) and a frame is dropped
  * when the receiving socket is backed up (bufferedAmount above RELAY_BACKLOG). */
+const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const { RoomManager, CREATE_GAP_MS, MAX_NAME, roomKey } = require('./rooms.js');
 // Host settings the create panel may send with createRoom (checked by server/room.js _settings).
@@ -32,10 +33,20 @@ const WS_PING_MS = 25000;            // ws-level ping frames; a socket missing 2
 const MEDIA_TYPES = new Set([1, 2, 3, 4]); // 1-2 JPEG video / PCM audio, 3 WebCodecs video, 4 Opus audio
 const MAX_HUMANS_PER_ROOM = 6;
 
-// opts: { seed?, timing? } as for Room; { room } reuses a Room as the default room; { manager } reuses a RoomManager.
+const WS_PATHS = new Set(['/ws', '/api/server']); // the second is the Vercel function behind the /ws rewrite
+
+// The cookie counts only when the page comes from this same site (a foreign page must not act as the user).
+function sameOrigin(req) {
+  try { return new URL(req.headers.origin).host === req.headers.host; } catch (e) { return false; }
+}
+
+// opts: { seed?, timing? } as for Room; { accounts } to know signed-in players; { room } reuses a Room as the default room; { manager } reuses a RoomManager.
 function attachMultiplayer(httpServer, opts) {
   const manager = (opts && opts.manager) || new RoomManager(opts || {});
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws', maxPayload: MAX_PAYLOAD });
+  const accounts = (opts && opts.accounts) || manager.accounts || null;
+  manager.accounts = accounts; // the HTTPS server shares them through the manager
+  const wss = new WebSocketServer({ server: httpServer, maxPayload: MAX_PAYLOAD });
+  wss.shouldHandle = (req) => WS_PATHS.has(req.url.split('?')[0]);
   const stats = { relayIn: 0, relayOut: 0, relayDropped: 0, relayBytesIn: 0, relayBytesOut: 0 };
   const pingMs = (opts && opts.timing && opts.timing.wsPingMs) || WS_PING_MS;
   const pinger = setInterval(() => {
@@ -78,11 +89,12 @@ function attachMultiplayer(httpServer, opts) {
     }
   }
 
-  // Room-list and room membership messages. Returns true when handled here.
+  // Room-list and room membership messages. Returns true when handled here (a promise of it in a cluster).
   function onRoomMsg(conn, msg) {
     switch (msg.t) {
       case 'rooms':
         manager.subscribers.add(conn);
+        if (manager.cluster) return manager.cluster.list().then((rooms) => { conn.send({ t: 'roomList', rooms }); return true; });
         conn.send({ t: 'roomList', rooms: manager.list() });
         return true;
       case 'unsubscribeRooms':
@@ -119,6 +131,7 @@ function attachMultiplayer(httpServer, opts) {
         }
         const entry = manager.create(msg.name, now, settings);
         manager.attach(conn, entry.room);
+        if (manager.cluster) return manager.cluster.created(entry).then(() => { conn.send({ t: 'roomJoined', id: entry.id }); return true; });
         conn.send({ t: 'roomJoined', id: entry.id });
         return true;
       }
@@ -127,9 +140,17 @@ function attachMultiplayer(httpServer, opts) {
           if (conn.room.roomId === msg.id) { conn.send({ t: 'roomJoined', id: msg.id }); return true; }
           throw new Error('leave the room first');
         }
+        if (manager.cluster) {
+          const id = typeof msg.id === 'string' ? msg.id.toUpperCase() : '';
+          return manager.cluster.join(conn, id).then((ok) => {
+            if (!ok) throw new Error('room not found');
+            conn.send({ t: 'roomJoined', id });
+            return true;
+          });
+        }
         const room = typeof msg.id === 'string' ? manager.get(msg.id.toUpperCase()) : null;
         if (!room) throw new Error('room not found');
-        if (room._humanCount() >= MAX_HUMANS_PER_ROOM) throw new Error('room full');
+        if (!room.ranked && room._humanCount() >= MAX_HUMANS_PER_ROOM) throw new Error('room full');
         manager.attach(conn, room);
         conn.send({ t: 'roomJoined', id: room.roomId });
         return true;
@@ -142,9 +163,20 @@ function attachMultiplayer(httpServer, opts) {
     return false;
   }
 
-  wss.on('connection', (ws) => {
+  function onMsg(conn, msg) {
+    if (!conn.room) {
+      // Legacy direct join: the default (hidden) room. Not in a cluster: no other server could find it.
+      if (msg && msg.t === 'join' && !manager.cluster) manager.attach(conn, manager.defaultRoom);
+      else { conn.send({ t: 'error', msg: 'join first' }); return; }
+    }
+    conn.room.receive(conn, msg);
+  }
+
+  wss.on('connection', (ws, req) => {
     const conn = {
       ws,
+      cid: crypto.randomBytes(8).toString('base64url'),
+      user: null,
       room: null,
       seat: null,
       clientId: null,
@@ -155,6 +187,14 @@ function attachMultiplayer(httpServer, opts) {
         ws.close();
       },
     };
+    // Messages wait for their turn when the account lookup or Redis makes one of them slow.
+    let queue = null;
+    const enqueue = (fn) => {
+      queue = queue.then(fn).catch((e) => conn.send({ t: 'error', msg: e.message }));
+    };
+    const signedIn = accounts && req.headers.cookie && sameOrigin(req);
+    if (manager.cluster || signedIn) queue = Promise.resolve();
+    if (signedIn) enqueue(async () => { conn.user = await accounts.fromRequest(req); });
     ws.on('message', (raw, isBinary) => {
       if (isBinary) {
         relay(conn, raw);
@@ -172,24 +212,26 @@ function attachMultiplayer(httpServer, opts) {
         return;
       }
       if (msg && msg.t === 'ping') { conn.send({ t: 'pong', ts: msg.ts, sv: Date.now() }); return; }
+      if (queue) {
+        enqueue(async () => {
+          if (!(msg && typeof msg === 'object' && await onRoomMsg(conn, msg))) onMsg(conn, msg);
+        });
+        return;
+      }
       try {
         if (msg && typeof msg === 'object' && onRoomMsg(conn, msg)) return;
       } catch (e) {
         conn.send({ t: 'error', msg: e.message });
         return;
       }
-      if (!conn.room) {
-        // Legacy direct join: the default (hidden) room.
-        if (msg && msg.t === 'join') manager.attach(conn, manager.defaultRoom);
-        else { conn.send({ t: 'error', msg: 'join first' }); return; }
-      }
-      conn.room.receive(conn, msg);
+      onMsg(conn, msg);
     });
     ws.missed = 0;
     ws.on('pong', () => { ws.missed = 0; });
     ws.on('close', () => {
-      manager.subscribers.delete(conn);
-      manager.detach(conn);
+      const gone = () => { manager.subscribers.delete(conn); manager.detach(conn); };
+      if (queue) enqueue(gone); // after any join still in progress
+      else gone();
     });
     ws.on('error', () => {}); // a failed socket is followed by 'close'
   });
