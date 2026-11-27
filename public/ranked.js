@@ -272,7 +272,7 @@
         if (!d) return;
         bots = d.bots;
         $('.rk-panel').innerHTML = '<p class="rk-note">' + esc(t('botsNote')) + '</p><ul class="rk-list">' + bots.slice().reverse().map(function (b) {
-          return '<li class="mr-row rk-row"><span class="rk-who"><b>' + esc(b.name) + ' (' + b.rating + ')</b><small>' + esc(t('tableRating', { r: b.table })) + '</small></span>' +
+          return '<li class="mr-row rk-row"><span class="rk-who"><b>' + esc(b.name) + ' (' + b.rating + ')</b></span>' +
             '<button type="button" class="mr-join" data-bot="' + esc(b.id) + '" aria-label="' + esc(t('playName', { name: b.name })) + '">' + esc(t('play')) + '</button></li>';
         }).join('') + '</ul>';
         drawPlay();

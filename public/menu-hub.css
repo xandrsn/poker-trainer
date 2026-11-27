@@ -59,25 +59,25 @@
   [data-view="menu"] .hub-opts > .mode-card { width: 204px !important; }
 }
 
-/* Narrow (phones, tablets, portrait): two columns. The active main opens its options below it. */
-@media (max-width: 959px) and (min-height: 521px) {
+/* Narrow (phones, tablets, narrow windows): Play and Practice side by side, always; the open group's options
+   fill a full-width row of three below both. display: contents lets the mains and options share one grid. */
+@media (max-width: 959px) and (min-height: 521px), (max-width: 639px) {
   [data-view="menu"] .menu-hub {
-    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start;
-    gap: 12px; max-width: 560px;
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch;
+    gap: 10px 12px; max-width: 560px; padding-left: 4px; padding-right: 4px; box-sizing: border-box;
   }
-  [data-view="menu"] .hub-group { flex-direction: column; align-items: stretch; gap: 8px; }
-  [data-view="menu"] .hub-main { width: 100%; height: 104px; padding: 10px 10px; }
+  [data-view="menu"] .hub-group { display: contents; }
+  [data-view="menu"] .hub-main { width: 100%; height: 96px; padding: 10px; order: 0; }
   [data-view="menu"] .hub-main .hm-desc { display: none; }
-  [data-view="menu"] .hub-opts { flex-direction: column; gap: 8px; }
+  [data-view="menu"] .hub-opts { order: 1; grid-column: 1 / -1; }
+  [data-view="menu"] .hub-group.is-open .hub-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   [data-view="menu"] .hub-opts > .mode-card {
-    width: 100% !important; height: 64px !important; flex-direction: row !important; justify-content: flex-start;
-    gap: 10px; padding: 8px 12px !important; text-align: left; flex-wrap: nowrap; align-items: center;
+    width: 100% !important; height: 84px !important; flex-direction: column !important; justify-content: center;
+    gap: 4px; padding: 8px 6px !important; text-align: center;
   }
-  [data-view="menu"] .hub-opts > .mode-card .mc-name { text-align: left; align-self: center; flex: 1 1 auto; width: auto; min-width: 0; }
-  [data-view="menu"] .hub-opts > .mode-card .mc-icon { flex: 0 0 auto; order: 0; }
   [data-view="menu"] .hub-opts > .mode-card .mc-icon svg { width: 20px; height: 20px; }
   [data-view="menu"] .hub-opts > .mode-card .mc-desc { display: none; }
-  [data-view="menu"] .hub-opts > .mode-card .mc-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  [data-view="menu"] .hub-opts > .mode-card .mc-name { font-size: 13.5px; line-height: 1.2; text-align: center; overflow-wrap: anywhere; }
 }
 
 /* Short landscape screens (844x390 and similar): options stay beside the main tile, in a compact form. */

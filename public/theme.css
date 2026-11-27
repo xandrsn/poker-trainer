@@ -251,7 +251,6 @@ html body[data-view="game"] .look-btn.look-float.look-btn { left: var(--s2); rig
 :root[data-bg-tone="light"] #btn-fold,
 :root[data-bg-tone="light"] #btn-fold .key,
 :root[data-bg-tone="light"] #btn-fold .label { color: #ffffff; }
-:root[data-bg-tone="light"] .ig-link { color: var(--muted); }
 
 /* ---------- light felt: the table labels (pot, bet chips, empty board slots) switch to dark ink ----------
  * theme.js sets data-felt-tone="light" when the felt needs dark ink. The pills keep a light fill so the dark ink stays

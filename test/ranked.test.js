@@ -8,7 +8,8 @@ const path = require('path');
 const WebSocket = require('ws');
 const { createServer } = require('../server.js');
 const { createStore } = require('../server/store.js');
-const { eloDelta } = require('../server/ranked.js');
+const { eloDelta, tableSize } = require('../server/ranked.js');
+const { START_RATING } = require('../server/accounts.js');
 const { Room } = require('../server/room.js');
 const NN = require('../server/nnbot.js');
 const G = require('../public/game.js');
@@ -122,7 +123,7 @@ test('memory store: survives a restart through its file, expires keys', async ()
 
 test('accounts: register, sign in, sign out; wrong password, taken name, bad input refused', async (s) => {
   const { name, cookie } = await signUp(s);
-  assert.strictEqual((await s.api('me', null, cookie)).data.user.rating, 1200);
+  assert.strictEqual((await s.api('me', null, cookie)).data.user.rating, START_RATING);
   assert.strictEqual(JSON.stringify((await s.api('profile?name=' + name)).data).includes('hash'), false);
   assert.strictEqual((await s.api('register', { name: name.toUpperCase(), password: 'correct horse' })).status, 409);
   assert.strictEqual((await s.api('login', { name, password: 'wrong wrong' })).status, 401);
@@ -199,7 +200,7 @@ test('google: needs its own browser and nonce, new players choose a name, accoun
     const made = await s.api('google/finish', { name }, first.cookie);
     assert.strictEqual(made.status, 200);
     const me = (await s.api('me', null, made.cookie)).data.user;
-    assert.deepStrictEqual([me.name, me.password, me.google, me.rating], [name, false, true, 1200]);
+    assert.deepStrictEqual([me.name, me.password, me.google, me.rating], [name, false, true, START_RATING]);
     assert.strictEqual((await s.api('login', { name, password: 'correct horse' })).status, 401, 'no password to sign in with');
     const back = await trip();
     assert.strictEqual(back.to, '/?google=ok');
@@ -238,7 +239,7 @@ test('ranked: two players meet, outsiders and foreign origins are kept out, resi
   await until(() => ca.state && ca.state.hand && cb.state && cb.state.hand, 'first hand');
   const lobby = ca.msgs.filter((m) => m.t === 'lobby').pop();
   assert.deepStrictEqual(lobby.players.map((p) => p.name).sort(), [a.name, b.name].sort());
-  assert.ok(lobby.players.every((p) => p.rating === 1200 && !p.host) && lobby.settings.ranked);
+  assert.ok(lobby.players.every((p) => p.rating === START_RATING && !p.host) && lobby.settings.ranked);
   for (const t of [{ t: 'endGame' }, { t: 'pause' }, { t: 'addBot' }, { t: 'kick', seat: 1 }, { t: 'rebuy' }, { t: 'settings', bb: 2 }]) ca.send(t);
   await until(() => ca.msgs.filter((m) => m.t === 'error').length === 6, 'host actions refused');
   assert.strictEqual((await s.api('queue', {}, a.cookie)).data.room, room, 'a running match is resumed');
@@ -246,11 +247,11 @@ test('ranked: two players meet, outsiders and foreign origins are kept out, resi
   cb.send({ t: 'resign' });
   await until(() => ca.rated && cb.rated, 'result');
   assert.strictEqual(ca.rated.winner, a.name);
-  assert.strictEqual((await s.api('me', null, a.cookie)).data.user.rating, 1220);
-  assert.strictEqual((await s.api('me', null, b.cookie)).data.user.rating, 1180);
+  assert.strictEqual((await s.api('me', null, a.cookie)).data.user.rating, START_RATING + 20);
+  assert.strictEqual((await s.api('me', null, b.cookie)).data.user.rating, START_RATING - 20);
   const p = (await s.api('profile?name=' + a.name)).data.player;
   assert.deepStrictEqual([p.games, p.wins, p.history.length, p.history[0].delta, p.history[0].opp], [1, 1, 1, 20, b.name]);
-  assert.ok((await s.api('leaderboard')).data.players.some((x) => x.name === a.name && x.rating === 1220));
+  assert.ok((await s.api('leaderboard')).data.players.some((x) => x.name === a.name && x.rating === START_RATING + 20));
   assert.strictEqual((await s.api('queue', {}, a.cookie)).data.status, 'waiting', 'free to play again');
   await s.api('queue/cancel', {}, a.cookie);
   [ca, cb, guest, foreign].forEach((c) => c.kill());
@@ -290,15 +291,21 @@ test('ranked: a match against a neural bot plays to the end and is rated', async
   await until(() => c.rated, 'match end', 30000);
   const me = (await s.api('me', null, a.cookie)).data.user;
   assert.strictEqual(me.games, 1);
-  assert.strictEqual(me.rating, 1200 + c.rated.players[0].delta);
+  assert.strictEqual(me.rating, START_RATING + c.rated.players[0].delta);
   assert.strictEqual(c.rated.winner === a.name, c.rated.players[0].delta > 0);
   c.kill();
+});
+
+test('ranked table size: 4 to 6 seats, as many as are waiting', () => {
+  assert.deepStrictEqual([0, 0.5, 0.99].map((r) => tableSize(1, () => r)), [4, 5, 6]);
+  assert.deepStrictEqual([4, 5, 6].map((n) => tableSize(n, () => 0)), [4, 5, 6]);
 });
 
 async function seatAt(s, n) { // n players waiting for a table, all matched
   const ps = [];
   for (let i = 0; i < n; i++) ps.push(await signUp(s));
   s.server.multiplayer.manager.opts.rankedService.tableWaitMs = 400;
+  s.server.multiplayer.manager.opts.rankedService.rng = () => 0.99; // a table of six
   await until(async () => {
     for (const p of ps) p.q = (await s.api('queue', { mode: 'table' }, p.cookie)).data;
     return ps.every((p) => p.q.status === 'matched');
@@ -330,7 +337,7 @@ test('ranked table: bots fill it, a resigned player is last at once, the others 
   for (const p of ps) {
     const u = (await s.api('profile?name=' + p.name)).data.player;
     const h = u.history[0];
-    assert.deepStrictEqual([u.games, u.wins, h.place, h.of, 1200 + h.delta], [1, h.place === 1 ? 1 : 0, p.c.rated.place, 6, u.rating]);
+    assert.deepStrictEqual([u.games, u.wins, h.place, h.of, START_RATING + h.delta], [1, h.place === 1 ? 1 : 0, p.c.rated.place, 6, u.rating]);
     p.c.kill();
   }
 });
@@ -398,7 +405,8 @@ test('bots: at every Elo they bluff, vary their play and never repeat one action
         const seat = hand.toAct, street = hand.street, L = G.legal(t, seat);
         const { p } = NN.policy(t, seat, bot, rng);
         const eq = hand.board.length && L.toCall === 0 ? E.equity(hand.seats[seat].cards, hand.board, 1, { samples: 100, rng }) : 1;
-        sure.n++; if (Math.max(...p) > 0.98) sure.all++;
+        // A sure fold of a bad hand is poker (as below); a sure check, call or raise is the repetitive kind.
+        sure.n++; if (Math.max(...p) > 0.98 && p[0] < 0.98) sure.all++;
         const a = NN.step(t, seat, bot.id, rng).action;
         counts[a] = (counts[a] || 0) + 1; total++;
         // A bet or a raise is what counts as repeating: folding bad hands six times in a row is poker.
@@ -452,7 +460,7 @@ test('solo tables: bots of one Elo or a mix, with different names and the Elo in
   assert.strictEqual(new Set(one.map((x) => x.name)).size, 8);
   const all = Ladder.LADDER.map((b) => b.id), mixed = new Set();
   for (let s = 0; s < 10; s++) G.newSession({ cpus: 8, seed: s, personalities: all }).seats.slice(1).forEach((x) => mixed.add(x.persona.type));
-  assert.deepStrictEqual([...mixed].sort(), all);
+  assert.deepStrictEqual([...mixed].sort(), all.slice().sort());
   const names = [].concat(...Ladder.LADDER.map((b) => b.names));
   assert.strictEqual(new Set(names).size, names.length);
   assert.ok(names.every((n) => n.length <= 16), 'room names hold 16 characters');

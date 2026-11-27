@@ -104,17 +104,13 @@
 [data-view="menu"] *:has(.mode-card)::-webkit-scrollbar { display: none; }
 [data-view="menu"] .mode-cards { padding: 8px 6px 10px; margin: -8px -6px -10px; }
 
-/* Instagram link: a quiet "@" in the bottom-right corner of the main menu. */
-.ig-link {
-  position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom));
-  width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%;
-  font: 600 17px/1 var(--font-mono, monospace); color: var(--text-dim, #9a9488); text-decoration: none;
-  border: 1px solid rgb(255 255 255 / 0.12); background: rgb(255 255 255 / 0.03);
-  transition: color 160ms ease, border-color 160ms ease, transform 160ms ease;
+/* Credit: quiet links in the bottom-right corner of the main menu. */
+[data-view="menu"] .menu-credit {
+  position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom));
+  margin: 0; text-align: right; font-size: 12px; opacity: 0.7; z-index: 2;
 }
-.ig-link:hover, .ig-link:focus-visible { color: var(--gold, #e6b43c); border-color: currentColor; transform: translateY(-2px); }
-@media (pointer: coarse) { .ig-link { width: 44px; height: 44px; } }
-@media (prefers-reduced-motion: reduce) { .ig-link { transition: none; } .ig-link:hover { transform: none; } }
+[data-view="menu"] .menu-credit a { display: inline-block; padding: 6px 2px; color: inherit; }
+[data-view="menu"] .menu-credit a:hover, [data-view="menu"] .menu-credit a:focus-visible { color: var(--gold, #e6b43c); }
 
 /* Main menu: Play / Practice tiles blend into the background; the gold highlight shows on hover, focus and when open. */
 [data-view="menu"] .hub-main { background: transparent !important; border-color: transparent !important; box-shadow: none; }

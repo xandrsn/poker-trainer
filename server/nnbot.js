@@ -38,7 +38,7 @@ function policy(table, seat, bot, rng) {
   rng = rng || Math.random;
   const L = G.legal(table, seat), multi = table.hand.m > 2;
   const f = multi ? NN.features(table, seat, L, rng, NN.data().preflop) : features(table, seat, rng);
-  return { p: NN.probs(multi ? NN.data().nets[bot.tnet] : NETS[bot.net], f, multi ? bot.ttemp : bot.temp), L };
+  return { p: NN.probs(multi ? NN.data().nets[bot.tnet] : NETS[bot.net], f, multi ? bot.ttemp : bot.temp, multi ? bot.teps : bot.eps), L };
 }
 
 // Plays one action for the bot on turn and returns the engine event.

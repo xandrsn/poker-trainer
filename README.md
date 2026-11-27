@@ -40,8 +40,8 @@ There are two networks, both small: two hidden layers, with a choice of five act
 - **How it learns:** by playing against itself (PPO). Each round it plays thousands of hands, compares the chips won with what was expected, and makes the actions that did better more likely. While training only, a second network that sees all the cards estimates what was expected. Nobody taught it poker rules of thumb.
 - **Not repetitive:** training pays for variety (entropy bonus). `test/ranked.test.js` checks at every Elo that bots bluff, mix their actions and do not bet every time; `BOT_STATS=1 node test/ranked.test.js` (Git Bash or Linux) prints the numbers.
 
-### Copies a to e
-Training saves five copies, from beginner to finished. `public/ladder.js` makes six levels out of them: a copy plus a temperature (above 1 it plays more at random, so weaker).
+### Copies a to e, levels 300 to 3000
+Training saves five copies, from beginner to finished. `public/ladder.js` makes ten levels out of them, one every 300 Elo from 300 to 3000: a copy, a temperature (above 1 its choices are flatter) and `eps`, the share of moves picked at random (never all-in). Both make a level weaker. The Elo is the level's place on the ladder, as with chess bots: every level beats the one below, but poker luck makes the measured gaps much smaller than 300 (the `fit` in `public/ladder.js`, mean 1200). A new account starts at 800.
 
 | Copy | Duels: rounds of 5000 | Tables: rounds of 5000 |
 |---|---|---|
@@ -51,8 +51,6 @@ Training saves five copies, from beginner to finished. `public/ladder.js` makes 
 | d | 1750 | 2000 |
 | e | 5000 | 5000 |
 
-The table training has only run to about round 1800, so tables have a, b and c so far. The levels in `public/ladder.js` use only those.
-
 ### Train other versions
 Needs Python with PyTorch (a GPU is recommended), from the project folder. The number after the script is the rounds: more is longer and usually stronger. 5000 rounds of tables took about 0.55 s each on the GPU used here, so roughly 45 to 50 minutes. Training starts from zero and replaces the old copies as it goes, so each command keeps a backup first. Stop the server while it runs, and close other programs: the last run stopped for lack of memory.
 
@@ -60,29 +58,29 @@ Tables, PowerShell:
 
     cd C:\dev\poker-trainer
     Copy-Item public\nn-models.json ml\nn-models.backup.json
-    python ml/train_multi.py 5000; if ($?) { node scripts/rate-bots.js 4000 table "a=4,a=2,b=1,c=1,d=1,e=1" --write }
+    python ml/train_multi.py 5000; if ($?) { node scripts/rate-bots.js 2000 table "a=3/0.8,a=3/0.6,a=2/0.45,a=1.5/0.3,b=1.2/0.2,b=1/0.1,c=1/0.05,d=1/0,e=1/0,e=0.6/0" --write }
 
 Tables, Git Bash or Linux:
 
     cd /c/dev/poker-trainer
     cp public/nn-models.json ml/nn-models.backup.json
-    python ml/train_multi.py 5000 && node scripts/rate-bots.js 4000 table a=4,a=2,b=1,c=1,d=1,e=1 --write
+    python ml/train_multi.py 5000 && node scripts/rate-bots.js 2000 table a=3/0.8,a=3/0.6,a=2/0.45,a=1.5/0.3,b=1.2/0.2,b=1/0.1,c=1/0.05,d=1/0,e=1/0,e=0.6/0 --write
 
 Duels, PowerShell:
 
     cd C:\dev\poker-trainer
     Copy-Item server\models.json ml\models.backup.json
-    python ml/train.py 5000; if ($?) { node scripts/rate-bots.js 800 "a=6,a=2,b=1,c=1,d=1,e=1" --write }
+    python ml/train.py 5000; if ($?) { node scripts/rate-bots.js 400 "a=3/0.8,a=3/0.6,a=2/0.45,a=1.5/0.3,b=1.2/0.2,b=1/0.1,c=1/0.05,d=1/0,e=1/0,e=0.6/0" --write }
 
 Duels, Git Bash or Linux:
 
     cd /c/dev/poker-trainer
     cp server/models.json ml/models.backup.json
-    python ml/train.py 5000 && node scripts/rate-bots.js 800 a=6,a=2,b=1,c=1,d=1,e=1 --write
+    python ml/train.py 5000 && node scripts/rate-bots.js 400 a=3/0.8,a=3/0.6,a=2/0.45,a=1.5/0.3,b=1.2/0.2,b=1/0.1,c=1/0.05,d=1/0,e=1/0,e=0.6/0 --write
 
 Other lengths: `python ml/train_multi.py 2000` (short), `python ml/train_multi.py 20000` (long). Use more than 100; below that it is only a smoke test.
 
-`rate-bots.js` plays the bots against each other and `--write` puts their Elo into `public/ladder.js`, weakest first. The list is `copy=temperature`, always six. Then run `npm test`.
+`rate-bots.js` plays the bots against each other (tables: six drawn at random each time) and `--write` puts the list and the measured Elo into `public/ladder.js`. The list is `copy=temperature/eps`, ten of them, weakest first; it warns when a level is not stronger than the one below, then change that level and run it again. Then run `npm test`.
 
 ## Deploy on Vercel
 The page is served from `public/`; the API and `/ws` run in one function (`api/server.mjs`, WebSocket public beta).

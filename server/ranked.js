@@ -1,5 +1,5 @@
 'use strict';
-/* Ranked play for rating points: duels against a player of similar rating or a trained bot, and tables of six.
+/* Ranked play for rating points: duels against a player of similar rating or a trained bot, and tables of 4 to 6.
  * The room itself (locked settings, forfeits, places) is server/room.js with `ranked` set. */
 const crypto = require('crypto');
 const NN = require('./nnbot.js');
@@ -10,8 +10,11 @@ const QUEUE_SEEN_MS = 8000;       // a waiting player who stops polling leaves t
 const STALE_MS = 2 * 60 * 1000;   // a match nobody is connected to for this long is over
 const ACTIVE_MS = 6 * 3600 * 1000;
 
-const TABLE_SEATS = 6;
+const TABLE_SEATS = 6;            // at most; at least 4
 const TABLE_WAIT_MS = 20000;      // then bots take the empty seats of a table
+
+// Seats of a table that starts with `humans` waiting: as many as wait (4 to 6), or a random 4 to 6 filled by bots.
+function tableSize(humans, rng) { return humans >= 4 ? Math.min(humans, TABLE_SEATS) : 4 + Math.floor(rng() * 3); }
 
 // Rating change against opps [{ rating, won }]: the average over all of them. New players move faster.
 function eloDelta(rating, opps, games) {
@@ -27,6 +30,7 @@ class Ranked {
     this.accounts = accounts;
     this.rooms = rooms;
     this.tableWaitMs = TABLE_WAIT_MS;
+    this.rng = Math.random;
   }
 
   bots() { return NN.LADDER.map((b) => ({ id: b.id, name: b.name, rating: b.rating, table: b.table })); }
@@ -73,7 +77,7 @@ class Ranked {
     }
   }
 
-  // Six waiting players, or those who wait once the first has waited long enough, with bots on the other seats.
+  // Six waiting players, or those who wait once the first has waited long enough, with bots on the other seats (tableSize).
   // shortcut: ratings are not compared, add bands when more than one table fills at a time.
   async _findTable(user, now) {
     await this.store.hdel('queue', user.id);
@@ -97,7 +101,7 @@ class Ranked {
         await this.store.hdel('queue:table', e.id);
       }
       const mean = users.reduce((n, u) => n + u.rating, 0) / users.length;
-      const bots = NN.LADDER.slice().sort((a, b) => Math.abs(a.table - mean) - Math.abs(b.table - mean)).slice(0, TABLE_SEATS - users.length);
+      const bots = NN.LADDER.slice().sort((a, b) => Math.abs(a.table - mean) - Math.abs(b.table - mean)).slice(0, tableSize(users.length, this.rng) - users.length);
       return { status: 'matched', room: await this._create('table', users, bots) };
     }
     await this.store.hset('queue:table', { [user.id]: JSON.stringify({ at: me.at, seen: now }) });
@@ -194,4 +198,4 @@ class Ranked {
   }
 }
 
-module.exports = { Ranked, eloDelta, SETTINGS };
+module.exports = { Ranked, eloDelta, tableSize, SETTINGS };

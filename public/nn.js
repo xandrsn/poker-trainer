@@ -121,13 +121,15 @@
     return { x: x, mask: [L.toCall > 0, true, sized, sized, L.canRaise] };
   }
 
-  // Action probabilities. temp > 1 flattens them (a weaker, looser player).
-  function probs(net, f, temp) {
+  // Action probabilities. temp > 1 flattens them; eps (0 to 1) is the share of moves picked at random among the
+  // allowed ones but all-in (random shoves would make weak bots swingy, not weak). Both make a weaker player.
+  function probs(net, f, temp, eps) {
     var z = forward(net, f.x).map(function (v, i) { return f.mask[i] ? v / (temp || 1) : -Infinity; });
     var top = Math.max.apply(null, z);
     var e = z.map(function (v) { return Math.exp(v - top); });
     var sum = e.reduce(function (a, b) { return a + b; }, 0);
-    return e.map(function (v) { return v / sum; });
+    var k = eps || 0, n = f.mask.slice(0, 4).filter(Boolean).length;
+    return e.map(function (v, i) { return (1 - k) * v / sum + (i < 4 && f.mask[i] ? k / n : 0); });
   }
 
   // Draws an action and turns it into { action, amount (chips) }.
@@ -143,10 +145,10 @@
     return { action: 'raise', amount: Math.max(L.minRaiseTo, Math.min(to, L.maxRaiseTo)) };
   }
 
-  function decide(table, seat, L, net, temp, rng) {
+  function decide(table, seat, L, net, temp, rng, eps) {
     rng = rng || Math.random;
     var d = data();
-    return draw(probs(d.nets[net], features(table, seat, L, rng, d.preflop), temp), table, L, rng);
+    return draw(probs(d.nets[net], features(table, seat, L, rng, d.preflop), temp, eps), table, L, rng);
   }
 
   function data() {

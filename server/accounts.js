@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const { promisify } = require('util');
 const scrypt = promisify(crypto.scrypt);
 
-const START_RATING = 1200;
+const START_RATING = 800; // as a chess beginner; the bots run from 300 to 3000
 const SESSION_MS = 30 * 24 * 3600 * 1000;
 const NAME_RE = /^[A-Za-z0-9_]{3,16}$/;
 const COOKIE = 'pt_session';

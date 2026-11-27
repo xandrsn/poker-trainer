@@ -47,7 +47,7 @@ A ranked match is a room with `settings.ranked` and `settings.kind`: `duel` (two
 - `{t:'profile', name?, avatar?, highlight?}` your name, avatar and highlight colour (any time once seated).
   - `avatar`: `null` to clear, or a data URL `data:image/jpeg|png|webp;base64,...` of at most **64 KB decoded** (exact: 65536 bytes accepted, 65537 refused, the size is the base64 length times 3/4 minus the `=` padding). Anything else is refused.
   - `highlight`: `#rrggbb` (lowercased by the server) or `null`.
-- `{t:'addBot', style?, name?, avatar?}` host; style is an Elo level, `lv1` (weakest) to `lv6`, see `public/ladder.js`; omitted = a random level. Any other value: 'unknown style'. Without a name the bot gets a free one of its level.
+- `{t:'addBot', style?, name?, avatar?}` host; style is an Elo level, `lv1` (300, weakest) to `lv10` (3000), see `public/ladder.js`; omitted = a random level. Any other value: 'unknown style'. Without a name the bot gets a free one of its level.
 - `{t:'editBot', seat, name?, avatar?, style?}` host. Name and avatar any time; `style` only between hands.
 - `{t:'removeBot', seat}` host, between hands.
 - `{t:'kick', seat}` host. Between hands the seat is freed at once. Mid-hand the player is removed from `lobby.players` and `state` at once and their socket is closed; they fold on their turn (at once if it is their turn now). Chips already in the pot stay there and are awarded normally. The seat is held until the hand ends, then freed. A second kick of that seat is refused ('that player is already leaving'), and the old clientId cannot rejoin meanwhile ('you were removed from this table').

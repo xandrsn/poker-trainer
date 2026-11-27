@@ -709,7 +709,7 @@
     return nn && nn.ready() ? nn : null;
   }
   function nnDecision(nn, session, idx, L, lv) {
-    var d = nn.decide(session, idx, L, lv.tnet, lv.ttemp, session.rng);
+    var d = nn.decide(session, idx, L, lv.tnet, lv.ttemp, session.rng, lv.teps);
     // One BB above an all-in: snapping to the half-BB grain below then never leaves a few chips behind.
     if (d.amount >= L.maxRaiseTo) d.amount = L.maxRaiseTo + session.hand.bb;
     if (d.amount) d.amount = bbOf(d.amount, session.hand.bb);

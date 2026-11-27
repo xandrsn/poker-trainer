@@ -1927,10 +1927,11 @@ test('last-action labels: every seat shows its last real action of the street, m
   };
   try {
     const a = await connect(t.port, 'Ann', 'ann-client-0311');
-    a.send({ t: 'addBot', style: 'lv1' });
-    a.send({ t: 'addBot', style: 'lv3' });
-    a.send({ t: 'addBot', style: 'lv5' });
+    a.send({ t: 'addBot', style: 'lv6' });
+    a.send({ t: 'addBot', style: 'lv8' });
+    a.send({ t: 'addBot', style: 'lv10' });
     await until(() => a.lobby && a.lobby.players.length === 4, 3000, 'four seats');
+    // Mid and top levels: the weakest ones lose their chips quickly and end the game before 40 hands.
     attachDriver(a, rng);
     a.send({ t: 'start' });
     await until(() => stats.hands.size >= 40, 90000, '40 hands');
